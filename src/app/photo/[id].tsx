@@ -13,7 +13,6 @@ import Animated, {
   SlideOutDown,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
   withSequence,
   withSpring,
   withTiming,
@@ -117,11 +116,7 @@ export default function PhotoScreen() {
   const zooming = useSharedValue(0);
   const sheetH = useSharedValue(0);
   const imgBottom = useSharedValue(height * 0.3);
-  const shade = useSharedValue(1); // мягкое затемнение сверху: видно при открытии, потом растворяется
   const chromeAway = useSharedValue(0); // 1 — кнопки уехали наверх (пока щипаем или тянем фото)
-  useEffect(() => {
-    shade.value = withDelay(2000, withTiming(0, { duration: 700, easing: Easing.inOut(Easing.cubic) }));
-  }, [shade]);
 
   const setFullMode = useCallback(
     (on: boolean) => {
@@ -251,7 +246,7 @@ export default function PhotoScreen() {
     const k = Math.max(fullP.value, chromeAway.value);
     return { transform: [{ translateY: -k * (insets.top + 80) }, { scale: 1 - k * 0.15 }] };
   });
-  const shadeStyle = useAnimatedStyle(() => ({ opacity: shade.value * (1 - chromeAway.value) }));
+  const shadeStyle = useAnimatedStyle(() => ({ opacity: 1 - chromeAway.value }));
   const sheetStyle = useAnimatedStyle(() => ({
     opacity: 1 - Math.min(1, drag.value / 150),
     transform: [{ translateY: fullP.value * (sheetH.value + 40) }],
@@ -335,7 +330,9 @@ export default function PhotoScreen() {
                 <Text style={styles.imgErr}>Снимок не загрузился</Text>
               </View>
             )}
+            {/* Затемнения как в макете: сверху — под кнопки, снизу — снимок перетекает в панель автора */}
             <Animated.View pointerEvents="none" style={[styles.shadeTop, shadeStyle]} />
+            <View pointerEvents="none" style={styles.shadeBottom} />
             <Animated.View pointerEvents="none" style={[styles.burst, burstStyle]}>
               <Icon name="heartFill" size={96} color={D.sun} />
             </Animated.View>
@@ -486,8 +483,13 @@ const styles = StyleSheet.create({
   cover: { position: 'absolute', top: 0, left: 0, right: 0 },
   sheetWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   shadeTop: {
-    position: 'absolute', left: 0, right: 0, top: 0, height: 200,
-    experimental_backgroundImage: 'linear-gradient(180deg, rgba(15,14,12,0.42) 0%, rgba(15,14,12,0.18) 45%, rgba(15,14,12,0) 100%)',
+    position: 'absolute', left: 0, right: 0, top: 0, height: 140,
+    experimental_backgroundImage: 'linear-gradient(180deg, rgba(15,14,12,0.7) 0%, rgba(15,14,12,0) 100%)',
+  },
+  // 160 px градиента до края панели + 28 px, которые уходят под её скругление
+  shadeBottom: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 188,
+    experimental_backgroundImage: 'linear-gradient(180deg, rgba(15,14,12,0) 0%, rgba(15,14,12,0.9) 85%, rgba(15,14,12,0.9) 100%)',
   },
   burst: { position: 'absolute', alignSelf: 'center', top: '40%' },
   imgState: { position: 'absolute', alignSelf: 'center', top: '42%', alignItems: 'center', gap: 8 },
