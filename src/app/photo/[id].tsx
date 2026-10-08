@@ -43,6 +43,9 @@ const ago = (d: Date) => {
   return `${Math.floor(days / 30)} мес. назад`;
 };
 
+// Снимок двигается плавно, без пружины (пружина — только у панелей)
+const SMOOTH = { duration: 320, easing: Easing.out(Easing.cubic) };
+
 // Панель автора помним открытой/свёрнутой между снимками
 let sheetOpenPref = true;
 
@@ -191,9 +194,9 @@ export default function PhotoScreen() {
       fullP.value = withTiming(on ? 1 : 0, { duration: 300, easing: Easing.out(Easing.cubic) });
       if (!on) {
         setUi(false); // из полного кадра возвращаемся к обычному виду со всем интерфейсом
-        scale.value = withTiming(1);
-        tx.value = withTiming(0);
-        ty.value = withTiming(0);
+        scale.value = withTiming(1, SMOOTH);
+        tx.value = withTiming(0, SMOOTH);
+        ty.value = withTiming(0, SMOOTH);
         savedScale.value = 1;
         savedTx.value = 0;
         savedTy.value = 0;
@@ -218,9 +221,9 @@ export default function PhotoScreen() {
           fullSV.value = 1;
           scheduleOnRN(setFullMode, true);
         } else if (scale.value > 1.05) {
-          scale.value = withSpring(1, { damping: 18 });
-          tx.value = withSpring(0, { damping: 18 });
-          ty.value = withSpring(0, { damping: 18 });
+          scale.value = withTiming(1, SMOOTH);
+          tx.value = withTiming(0, SMOOTH);
+          ty.value = withTiming(0, SMOOTH);
           savedScale.value = 1;
           savedTx.value = 0;
           savedTy.value = 0;
@@ -228,9 +231,9 @@ export default function PhotoScreen() {
           const k = 2.5; // приближаем к точке касания
           const nx = (width / 2 - e.x) * (k - 1);
           const ny = (height / 2 - e.y) * (k - 1);
-          scale.value = withSpring(k, { damping: 18 });
-          tx.value = withSpring(nx, { damping: 18 });
-          ty.value = withSpring(ny, { damping: 18 });
+          scale.value = withTiming(k, SMOOTH);
+          tx.value = withTiming(nx, SMOOTH);
+          ty.value = withTiming(ny, SMOOTH);
           savedScale.value = k;
           savedTx.value = nx;
           savedTy.value = ny;
@@ -254,9 +257,9 @@ export default function PhotoScreen() {
       })
       .onEnd(() => {
         if (scale.value < 1) {
-          scale.value = withSpring(1);
-          tx.value = withSpring(0);
-          ty.value = withSpring(0);
+          scale.value = withTiming(1, SMOOTH);
+          tx.value = withTiming(0, SMOOTH);
+          ty.value = withTiming(0, SMOOTH);
           savedTx.value = 0;
           savedTy.value = 0;
         }
@@ -285,8 +288,8 @@ export default function PhotoScreen() {
           const my = (height * (scale.value - 1)) / 2;
           const cx = Math.min(mx, Math.max(-mx, tx.value));
           const cy = Math.min(my, Math.max(-my, ty.value));
-          tx.value = withSpring(cx, { damping: 20 });
-          ty.value = withSpring(cy, { damping: 20 });
+          tx.value = withTiming(cx, SMOOTH);
+          ty.value = withTiming(cy, SMOOTH);
           savedTx.value = cx;
           savedTy.value = cy;
           back();
@@ -296,7 +299,7 @@ export default function PhotoScreen() {
           drag.value = withTiming(height * 0.5, { duration: 200 });
           scheduleOnRN(goBack);
         } else {
-          drag.value = withSpring(0, { damping: 18 });
+          drag.value = withTiming(0, SMOOTH);
           back();
         }
       });
