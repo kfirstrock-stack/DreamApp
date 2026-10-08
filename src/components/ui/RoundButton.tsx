@@ -1,4 +1,6 @@
-import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { useEffect, useState } from 'react';
+import { AccessibilityInfo, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { D, lightShadow } from '@/lib/design';
 import { Icon, type IconName } from '../Icon';
@@ -19,11 +21,33 @@ const TONES = {
   sun: { bg: D.sun, fg: D.white },
 };
 
+// Настоящее «жидкое стекло» iOS 26; где его нет (старый iOS, Android, «Понижение прозрачности») — затемнённый круг
+const GLASS_OK = (() => {
+  try {
+    return isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
+  } catch {
+    return false;
+  }
+})();
+
+function useGlass() {
+  const [reduce, setReduce] = useState(false);
+  useEffect(() => {
+    if (!GLASS_OK) return;
+    AccessibilityInfo.isReduceTransparencyEnabled().then(setReduce).catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceTransparencyChanged', setReduce);
+    return () => sub.remove();
+  }, []);
+  return GLASS_OK && !reduce;
+}
+
 // Круглая кнопка: при нажатии чуть сжимается на пружине
 export function RoundButton({ icon, onPress, size = 44, tone = 'light', label, style }: Props) {
   const s = useSharedValue(1);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
   const t = TONES[tone];
+  const glass = useGlass() && tone === 'glass';
+  const dims = { width: size, height: size, borderRadius: size / 2 };
   return (
     <Pressable
       onPress={onPress}
@@ -35,9 +59,15 @@ export function RoundButton({ icon, onPress, size = 44, tone = 'light', label, s
       style={style}
     >
       <Animated.View style={anim}>
-        <View style={[styles.base, tone === 'light' && lightShadow, { width: size, height: size, borderRadius: size / 2, backgroundColor: t.bg }]}>
-          <Icon name={icon} size={size * 0.42} color={t.fg} />
-        </View>
+        {glass ? (
+          <GlassView glassEffectStyle="regular" colorScheme="dark" isInteractive style={[styles.base, dims]}>
+            <Icon name={icon} size={size * 0.42} color={t.fg} />
+          </GlassView>
+        ) : (
+          <View style={[styles.base, tone === 'light' && lightShadow, dims, { backgroundColor: t.bg }]}>
+            <Icon name={icon} size={size * 0.42} color={t.fg} />
+          </View>
+        )}
       </Animated.View>
     </Pressable>
   );

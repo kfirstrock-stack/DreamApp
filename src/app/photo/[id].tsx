@@ -13,6 +13,7 @@ import Animated, {
   SlideOutDown,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withSequence,
   withSpring,
   withTiming,
@@ -116,6 +117,11 @@ export default function PhotoScreen() {
   const zooming = useSharedValue(0);
   const sheetH = useSharedValue(0);
   const imgBottom = useSharedValue(height * 0.3);
+  const shade = useSharedValue(1); // мягкое затемнение сверху: видно при открытии, потом растворяется
+  const chromeAway = useSharedValue(0); // 1 — кнопки уехали наверх (пока щипаем или тянем фото)
+  useEffect(() => {
+    shade.value = withDelay(2000, withTiming(0, { duration: 700, easing: Easing.inOut(Easing.cubic) }));
+  }, [shade]);
 
   const setFullMode = useCallback(
     (on: boolean) => {
@@ -165,8 +171,17 @@ export default function PhotoScreen() {
           savedTy.value = ny;
         }
       });
+    const away = () => {
+      'worklet';
+      chromeAway.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
+    };
+    const back = () => {
+      'worklet';
+      chromeAway.value = withSpring(0, { damping: 15, stiffness: 180 });
+    };
     const pinch = Gesture.Pinch()
       .onStart(() => {
+        away();
         if (fullSV.value === 0) scheduleOnRN(setFullMode, true);
       })
       .onUpdate((e) => {
@@ -181,12 +196,14 @@ export default function PhotoScreen() {
           savedTy.value = 0;
         }
         savedScale.value = Math.max(1, scale.value);
+        back();
       });
     const pan = Gesture.Pan()
       .activeOffsetX([-12, 12])
       .activeOffsetY([-12, 12])
       .onStart(() => {
         zooming.value = scale.value > 1.05 ? 1 : 0;
+        away();
       })
       .onUpdate((e) => {
         if (zooming.value) {
@@ -207,6 +224,7 @@ export default function PhotoScreen() {
           ty.value = withSpring(cy, { damping: 20 });
           savedTx.value = cx;
           savedTy.value = cy;
+          back();
           return;
         }
         if (drag.value > 120 || e.velocityY > 900) {
@@ -214,6 +232,7 @@ export default function PhotoScreen() {
           scheduleOnRN(goBack);
         } else {
           drag.value = withSpring(0, { damping: 18 });
+          back();
         }
       });
     return Gesture.Race(Gesture.Simultaneous(pinch, pan), Gesture.Exclusive(double, single));
@@ -228,7 +247,11 @@ export default function PhotoScreen() {
     opacity: fullP.value,
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
   }));
-  const chromeStyle = useAnimatedStyle(() => ({ opacity: 1 - fullP.value }));
+  const chromeStyle = useAnimatedStyle(() => {
+    const k = Math.max(fullP.value, chromeAway.value);
+    return { transform: [{ translateY: -k * (insets.top + 80) }, { scale: 1 - k * 0.15 }] };
+  });
+  const shadeStyle = useAnimatedStyle(() => ({ opacity: shade.value * (1 - chromeAway.value) }));
   const sheetStyle = useAnimatedStyle(() => ({
     opacity: 1 - Math.min(1, drag.value / 150),
     transform: [{ translateY: fullP.value * (sheetH.value + 40) }],
@@ -312,7 +335,7 @@ export default function PhotoScreen() {
                 <Text style={styles.imgErr}>Снимок не загрузился</Text>
               </View>
             )}
-            <View style={styles.shadeTop} />
+            <Animated.View pointerEvents="none" style={[styles.shadeTop, shadeStyle]} />
             <Animated.View pointerEvents="none" style={[styles.burst, burstStyle]}>
               <Icon name="heartFill" size={96} color={D.sun} />
             </Animated.View>
@@ -462,7 +485,10 @@ const styles = StyleSheet.create({
   viewer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   cover: { position: 'absolute', top: 0, left: 0, right: 0 },
   sheetWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  shadeTop: { position: 'absolute', left: 0, right: 0, top: 0, height: 130, backgroundColor: 'rgba(15,14,12,0.35)' },
+  shadeTop: {
+    position: 'absolute', left: 0, right: 0, top: 0, height: 200,
+    experimental_backgroundImage: 'linear-gradient(180deg, rgba(15,14,12,0.42) 0%, rgba(15,14,12,0.18) 45%, rgba(15,14,12,0) 100%)',
+  },
   burst: { position: 'absolute', alignSelf: 'center', top: '40%' },
   imgState: { position: 'absolute', alignSelf: 'center', top: '42%', alignItems: 'center', gap: 8 },
   imgErr: { fontFamily: F.sans, fontSize: 14, color: D.paper, opacity: 0.7 },
