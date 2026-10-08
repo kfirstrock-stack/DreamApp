@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -5,12 +6,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import MapView from 'react-native-maps';
-import Animated, { FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown, useSharedValue } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition, SlideInDown, SlideOutDown, useSharedValue, withTiming } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { HALO, MomentLayer, PIN, type Pin } from '@/components/map/MomentLayer';
 import { StackFan } from '@/components/map/StackFan';
 import { RollingTime } from '@/components/time/RollingTime';
+import { ScaleGrip, type ScaleMode } from '@/components/time/ScaleGrip';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
 import { PillButton } from '@/components/ui/PillButton';
 import { RoundButton } from '@/components/ui/RoundButton';
@@ -28,6 +32,8 @@ import type { Photo } from '@/lib/types';
 
 // Выбор шага шкалы и вида карты помним, пока приложение открыто
 let stepPref: Step = '15m';
+let scaleModePref: ScaleMode = 'full';
+let nudged = false; // «кивок» ручки — один раз за запуск
 // Кэш снимков по диапазону и области: при смене шага/дня показываем сразу, обновляем в фоне
 const photoCache = new Map<string, Photo[]>();
 const cacheKey = (step: Step, start: Date, r: MapRegion) =>
@@ -94,6 +100,23 @@ export default function MapScreen() {
   const [start, setStart] = useState(() => rangeStart(stepPref, new Date()));
   const [index, setIndex] = useState(() => bucketIndex(stepPref, rangeStart(stepPref, new Date()), new Date()));
   const [stepMenu, setStepMenu] = useState(false);
+  const [mode, setModeState] = useState<ScaleMode>(scaleModePref);
+  const [nudge] = useState(() => {
+    const first = !nudged;
+    nudged = true;
+    return first;
+  });
+  const setMode = (m: ScaleMode) => {
+    scaleModePref = m;
+    setModeState(m);
+  };
+  // S1 ⇄ S2 ⇄ S3: свайп по язычку вниз — сворачиваем на ступень, вверх — раскрываем; тап — из полной в компактную, иначе — в полную
+  const gripSwipe = (dir: 'up' | 'down') => {
+    const order: ScaleMode[] = ['full', 'compact', 'mini'];
+    const i = order.indexOf(mode) + (dir === 'down' ? 1 : -1);
+    if (i >= 0 && i < order.length) setMode(order[i]);
+  };
+  const gripTap = () => setMode(mode === 'full' ? 'compact' : 'full');
   const anchor = useRef(new Date());
   const [mapStyle, setMapStyle] = useState<MapStyle>(mapStylePref);
   const [layers, setLayers] = useState(false);
@@ -155,6 +178,39 @@ export default function MapScreen() {
     indexSV.value = i;
     now.value = i * STEP_MIN + STEP_MIN / 2;
   };
+  // S3: свайп по строке — соседний интервал (через границу суток/месяца/года — в соседний диапазон)
+  const stepBy = (delta: number) => {
+    const n = bucketCount(step, start);
+    let st = start, i = index + delta;
+    if (i < 0) {
+      st = shiftRange(step, start, -1);
+      i = bucketCount(step, st) - 1;
+    } else if (i >= n) {
+      st = shiftRange(step, start, 1);
+      if (st > new Date()) return;
+      i = 0;
+    }
+    if (st !== start) setStart(st);
+    setIndex(i);
+    indexSV.value = i;
+    now.value = withTiming(i * STEP_MIN + STEP_MIN / 2, { duration: 260 });
+    Haptics.selectionAsync().catch(() => {});
+  };
+  const miniGesture = Gesture.Exclusive(
+    Gesture.Pan()
+      .activeOffsetX([-14, 14])
+      .failOffsetY([-14, 14])
+      .onEnd((e) => {
+        if (e.translationX < -30 || e.velocityX < -500) scheduleOnRN(stepBy, 1);
+        else if (e.translationX > 30 || e.velocityX > 500) scheduleOnRN(stepBy, -1);
+      }),
+    Gesture.Pan()
+      .activeOffsetY([-14, 14])
+      .onEnd((e) => {
+        if (e.translationY < -20) scheduleOnRN(setMode, 'compact');
+      }),
+    Gesture.Tap().onEnd(() => scheduleOnRN(setMode, 'full')),
+  );
   const chooseMapStyle = (m: MapStyle) => {
     mapStylePref = m;
     setMapStyle(m);
@@ -475,18 +531,41 @@ export default function MapScreen() {
         </Animated.View>
       )}
 
-      {/* Карточка шкалы времени */}
-      <View style={[styles.sheet, { bottom: sheetBottom }]} onLayout={(e) => setSheet({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
-        <TimeScrubber
-          key={`${step}:${counts.length}`}
-          ticks={ticks(step, start)}
-          counts={counts}
-          initialIndex={index}
-          now={now}
-          index={indexSV}
-          onIndexChange={setIndex}
-          jumpTo={jump}
-          footer={
+      {/* Карточка шкалы времени: полная (S1), компактная (S2) или одна строка (S3) */}
+      <Animated.View
+        layout={LinearTransition.springify().damping(SHEET_SPRING.damping).stiffness(SHEET_SPRING.stiffness).mass(SHEET_SPRING.mass)}
+        style={[styles.sheet, mode === 'mini' && styles.sheetMini, { bottom: sheetBottom }]}
+        onLayout={(e) => setSheet({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}
+      >
+        <ScaleGrip mode={mode} onTap={gripTap} onSwipe={gripSwipe} nudge={nudge && mode === 'full'} />
+        {mode === 'mini' ? (
+          <GestureDetector gesture={miniGesture}>
+            <Animated.View key="mini" entering={FadeIn.duration(220)} style={styles.miniRow}>
+              <Text style={styles.miniTime}>{clockStep ? clock(step, start, index) : bigLabel(step, start, index)}</Text>
+              <Text style={styles.miniMeta} numberOfLines={1}>
+                {rangeLabel(step, start).replace(/ \d{4}$/, '')} · {inWindow} фото
+              </Text>
+              <View style={{ flex: 1 }} />
+              <Pressable onPress={() => setStepMenu((v) => !v)} style={styles.stepChip} hitSlop={6} accessibilityLabel="Шаг шкалы">
+                <Text style={styles.stepText}>{STEPS.find((x) => x.key === step)!.chip}</Text>
+                <Icon name="chevD" size={14} color={D.ink} />
+              </Pressable>
+            </Animated.View>
+          </GestureDetector>
+        ) : (
+          <Animated.View key={mode} entering={FadeIn.duration(220)}>
+            <TimeScrubber
+              key={`${step}:${counts.length}:${mode}`}
+              compact={mode === 'compact'}
+              ticks={ticks(step, start)}
+              counts={counts}
+              initialIndex={index}
+              now={now}
+              index={indexSV}
+              onIndexChange={setIndex}
+              jumpTo={jump}
+              footer={
+                mode === 'full' ? (
             inWindow > 0 ? (
               <View style={styles.summary}>
                 <View style={styles.summaryAvas}>
@@ -503,8 +582,9 @@ export default function MapScreen() {
                 </Text>
               </View>
             ) : null
-          }
-          header={
+                ) : null
+              }
+              header={
             <View style={styles.head}>
               <View style={styles.dayRow}>
                 <Pressable hitSlop={10} onPress={() => setStart((st) => shiftRange(step, st, -1))} accessibilityLabel="Назад">
@@ -535,7 +615,15 @@ export default function MapScreen() {
                     {bigLabel(step, start, index)}
                   </Animated.Text>
                 )}
-                <View style={styles.timeMeta}>
+                <View style={[styles.timeMeta, styles.untilRow]}>
+                  {/* U5: конец окна — через многоточие по нижнему краю, чтобы не читалось как минус */}
+                  {clockStep && (
+                    <View style={styles.ellipsis}>
+                      <View style={styles.ellDot} />
+                      <View style={styles.ellDot} />
+                      <View style={styles.ellDot} />
+                    </View>
+                  )}
                   <Text style={styles.until}>
                     {untilLabel(step, start, index)}
                     {inWindow === 0 ? ' · 0 фото' : ''}
@@ -543,9 +631,11 @@ export default function MapScreen() {
                 </View>
               </View>
             </View>
-          }
-        />
-      </View>
+              }
+            />
+          </Animated.View>
+        )}
+      </Animated.View>
 
       {/* M2 · меню шага над шкалой */}
       {stepMenu && (
@@ -650,6 +740,10 @@ const styles = StyleSheet.create({
   sheet: {
     position: 'absolute', left: 12, right: 12, backgroundColor: D.white, borderRadius: 28, paddingTop: 16, paddingBottom: 6, ...softShadow, zIndex: 1000, elevation: 30,
   },
+  sheetMini: { paddingTop: 0, paddingBottom: 0 },
+  miniRow: { height: 64, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20 },
+  miniTime: { fontFamily: F.serif, fontSize: 28, color: D.ink },
+  miniMeta: { flexShrink: 1, fontFamily: F.mono, fontSize: 11, color: D.ink60, letterSpacing: 0.66 },
   head: { paddingHorizontal: 20 },
   dayRow: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 27 },
   day: { fontFamily: F.mono, fontSize: 11, color: D.ink60, letterSpacing: 0.66 },
@@ -678,4 +772,7 @@ const styles = StyleSheet.create({
   timeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, marginBottom: 8, marginLeft: -4 },
   timeMeta: { marginLeft: 12, marginTop: 8 },
   until: { fontFamily: F.sans, fontSize: 18, color: D.ink60 },
+  untilRow: { flexDirection: 'row', alignItems: 'flex-end' },
+  ellipsis: { flexDirection: 'row', gap: 2.6, marginRight: 3, marginBottom: 6 },
+  ellDot: { width: 2.6, height: 2.6, borderRadius: 1.3, backgroundColor: D.ink60, opacity: 0.8 },
 });

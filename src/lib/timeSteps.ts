@@ -93,7 +93,7 @@ export function bigLabel(step: Step, start: Date, i: number) {
 /** Подпись справа от времени */
 export function untilLabel(step: Step, start: Date, i: number) {
   const b = bucketStart(step, start, i + 1);
-  if (step === '15m' || step === 'hour') return `–${pad(b.getHours() === 0 && b.getDate() !== start.getDate() ? 24 : b.getHours())}:${pad(b.getMinutes())}`;
+  if (step === '15m' || step === 'hour') return `${pad(b.getHours() === 0 && b.getDate() !== start.getDate() ? 24 : b.getHours())}:${pad(b.getMinutes())}`;
   if (step === 'day') return WD_FULL[bucketStart(step, start, i).getDay()];
   return `${i + 1} неделя`;
 }

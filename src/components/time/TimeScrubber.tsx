@@ -30,9 +30,10 @@ type Props = {
   header?: ReactNode;
   footer?: ReactNode;
   ticks?: { i: number; label: string }[]; // подписи под шкалой
+  compact?: boolean; // S2: тонкие столбики 24 пт без подписей
 };
 
-const Bar = memo(function Bar({ i, h, x }: { i: number; h: number; x: SharedValue<number> }) {
+const Bar = memo(function Bar({ i, h, w, x }: { i: number; h: number; w: number; x: SharedValue<number> }) {
   const style = useAnimatedStyle(() => {
     const d = Math.abs(x.value / ITEM - i);
     const lens = d < 4 ? 1 - d / 4 : 0;
@@ -41,14 +42,17 @@ const Bar = memo(function Bar({ i, h, x }: { i: number; h: number; x: SharedValu
       backgroundColor: d < 0.5 ? D.sun : 'rgba(22,19,15,0.17)',
     };
   });
-  return <Animated.View style={[styles.bar, { height: h }, style]} />;
+  return <Animated.View style={[styles.bar, { height: h, width: w, borderRadius: Math.min(2, w / 2) }, style]} />;
 });
 
 // Шкала-гистограмма суток: едет за пальцем, после броска докатывается по инерции,
 // тап по гистограмме — переход к моменту, щелчок вибрацией на каждом шаге.
 export const TimeScrubber = memo(function TimeScrubber({
-  counts, initialIndex, now, index, onIndexChange, jumpTo, sidePadding = 12, header, footer, ticks,
+  counts, initialIndex, now, index, onIndexChange, jumpTo, sidePadding = 12, header, footer, ticks, compact = false,
 }: Props) {
+  const maxH = compact ? 20 : MAX_H;
+  const barW = compact ? 4 : BAR_W;
+  const H = compact ? 24 : H_FULL;
   const BUCKETS = counts.length;
   const { width } = useWindowDimensions();
   const innerW = width - sidePadding * 2 - INSET * 2; // B1: шкала с отступом 20 от краёв карточки
@@ -60,7 +64,7 @@ export const TimeScrubber = memo(function TimeScrubber({
   const moving = useSharedValue(false);
   const caught = useSharedValue(false);
   const max = Math.max(1, ...counts);
-  const heights = useMemo(() => counts.map((c) => (c === 0 ? 3 : 8 + (c / max) * (MAX_H - 8))), [counts, max]);
+  const heights = useMemo(() => counts.map((c) => (c === 0 ? (compact ? 2 : 3) : (compact ? 5 : 8) + (c / max) * (maxH - (compact ? 5 : 8)))), [counts, max, maxH, compact]);
 
   const auto = useSharedValue(false); // шкала едет сама (по команде) — без вибрации
   const tick = (i: number, quiet: boolean) => {
@@ -154,27 +158,25 @@ export const TimeScrubber = memo(function TimeScrubber({
     <GestureDetector gesture={gesture}>
       <View collapsable={false}>
         {header}
-        <View style={styles.wrap} onLayout={(e) => (barsTop.value = e.nativeEvent.layout.y)}>
+        <View style={[styles.wrap, { height: compact ? H + 10 : H + 28 }]} onLayout={(e) => (barsTop.value = e.nativeEvent.layout.y)}>
+          {/* T2 · «окно интервала»: мягкая капсула под выбранным столбиком, на всю высоту шкалы */}
+          <View pointerEvents="none" style={[styles.window, { height: H + 6, width: compact ? 11 : 13, borderRadius: compact ? 5.5 : 6.5, left: center - (compact ? 5.5 : 6.5) }]} />
           <Animated.View style={[styles.content, { width: BUCKETS * ITEM }, rowStyle]}>
-            <View style={styles.bars}>
+            <View style={[styles.bars, { height: H, marginTop: 6 }]}>
               {heights.map((h, i) => (
                 <View key={i} style={styles.slot}>
-                  <Bar i={i} h={h} x={x} />
+                  <Bar i={i} h={h} w={barW} x={x} />
                 </View>
               ))}
             </View>
-            <View style={styles.ticks}>
+            {!compact && <View style={styles.ticks}>
               {(ticks ?? Array.from({ length: 13 }, (_, k) => ({ i: k * 8, label: `${String(k * 2).padStart(2, '0')}:00` }))).map((t) => (
                 <Text key={t.i} style={[styles.tick, { left: t.i * ITEM + ITEM / 2 - 20 }]}>
                   {t.label}
                 </Text>
               ))}
-            </View>
+            </View>}
           </Animated.View>
-          <View pointerEvents="none" style={styles.marker}>
-            <View style={styles.dot} />
-            <View style={styles.line} />
-          </View>
         </View>
         {footer}
       </View>
@@ -182,16 +184,14 @@ export const TimeScrubber = memo(function TimeScrubber({
   );
 });
 
-const H = Math.round(MAX_H * 1.3) + 4;
+const H_FULL = Math.round(MAX_H * 1.3) + 4;
 const styles = StyleSheet.create({
-  wrap: { height: H + 28, overflow: 'hidden', marginHorizontal: INSET },
+  wrap: { overflow: 'hidden', marginHorizontal: INSET },
+  window: { position: 'absolute', top: 0, backgroundColor: 'rgba(255,90,54,0.12)' },
   content: { position: 'absolute', left: 0, top: 0 },
-  bars: { flexDirection: 'row', alignItems: 'flex-end', height: H },
+  bars: { flexDirection: 'row', alignItems: 'flex-end' },
   slot: { width: ITEM, alignItems: 'center', justifyContent: 'flex-end' },
-  bar: { width: BAR_W, borderRadius: 2, transformOrigin: 'bottom' },
+  bar: { transformOrigin: 'bottom' },
   ticks: { height: 20, marginTop: 6 },
   tick: { position: 'absolute', width: 40, textAlign: 'center', fontFamily: F.mono, fontSize: 10, color: D.ink40 },
-  marker: { position: 'absolute', top: 0, height: H + 4, left: 0, right: 0, alignItems: 'center' },
-  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: D.sun },
-  line: { width: 2, flex: 1, backgroundColor: D.sun, borderRadius: 1 },
 });
