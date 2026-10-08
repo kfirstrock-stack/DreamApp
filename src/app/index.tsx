@@ -2,11 +2,12 @@ import * as Location from 'expo-location';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import MapView from 'react-native-maps';
 import Animated, { FadeIn, FadeOut, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
-import { MomentLayer, PIN, type Pin } from '@/components/map/MomentLayer';
+import { HALO, MomentLayer, PIN, type Pin } from '@/components/map/MomentLayer';
 import { StackFan } from '@/components/map/StackFan';
 import { RollingTime } from '@/components/time/RollingTime';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
@@ -52,7 +53,12 @@ const hhmm = (m: number) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
 const WD = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
 const MON = ['ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ', 'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'];
 const dayLabel = (d: Date) => `${WD[d.getDay()]}, ${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`;
-const mood = (n: number) => (n === 0 ? 'никого' : n < 3 ? 'тихо' : n < 6 ? 'людно' : 'очень людно');
+const plural = (n: number, one: string, few: string, many: string) => {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+};
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
@@ -172,34 +178,65 @@ export default function MapScreen() {
     const xy = new Map(near.map((o) => [o.p.id, project(o.p.lat, o.p.lng, region, size.w, size.h)]));
     const isActive = (m: number) => Math.floor(m / STEP_MIN) === index;
     const inWindow = near.filter((o) => isActive(o.minutes)).sort((a, b) => (b.p.like_count ?? 0) - (a.p.like_count ?? 0));
-    const hidden = new Set<string>();
+    const d = (a: Photo, b: Photo) => {
+      const p = xy.get(a.id)!, q = xy.get(b.id)!;
+      return Math.hypot(p.x - q.x, p.y - q.y);
+    };
+    // Раскладка без наложений:
+    // 1) снимки ближе «рамка + подпись» друг к другу собираются в стопку;
+    // 2) всё, что попало в круг стопки, уходит в неё;
+    // 3) стопки, чьи круги пересекаются, сливаются.
+    const TOUCH = PIN + 22; // рамка + подпись времени
+    const IN_HALO = HALO / 2 + PIN / 2;
+    const free = new Set(inWindow.map((o) => o.p.id));
+    let list: Photo[][] = [];
     for (const o of inWindow) {
-      if (hidden.has(o.p.id)) continue;
-      const a = xy.get(o.p.id)!;
-      const group = [o.p];
-      for (const q of inWindow) {
-        if (q === o || hidden.has(q.p.id) || groups.has(q.p.id)) continue;
-        const b = xy.get(q.p.id)!;
-        if (Math.hypot(a.x - b.x, a.y - b.y) < PIN * 0.9) {
-          hidden.add(q.p.id);
-          group.push(q.p);
-        }
-      }
-      groups.set(o.p.id, group);
+      if (!free.has(o.p.id)) continue;
+      free.delete(o.p.id);
+      const g = [o.p];
+      for (const q of inWindow) if (free.has(q.p.id) && d(o.p, q.p) < TOUCH) (g.push(q.p), free.delete(q.p.id));
+      if (g.length > 1) for (const q of inWindow) if (free.has(q.p.id) && d(o.p, q.p) < IN_HALO) (g.push(q.p), free.delete(q.p.id));
+      list.push(g);
     }
-    // соседние по времени снимки не налезают на снимки текущего интервала
-    const leaders = [...groups.keys()].map((id) => xy.get(id)!);
+    for (let changed = true; changed; ) {
+      changed = false;
+      outer: for (let i = 0; i < list.length; i++)
+        for (let j = i + 1; j < list.length; j++) {
+          const A = list[i], B = list[j];
+          const stacks = (A.length > 1 ? 1 : 0) + (B.length > 1 ? 1 : 0);
+          const limit = stacks === 2 ? HALO : stacks === 1 ? IN_HALO : TOUCH;
+          if (d(A[0], B[0]) < limit) {
+            list[i] = [...A, ...B]; // первым остаётся более «залайканный» лидер
+            list = list.filter((_, k) => k !== j);
+            changed = true;
+            break outer;
+          }
+        }
+    }
+    const hidden = new Set<string>();
+    for (const g of list) {
+      groups.set(g[0].id, g);
+      g.slice(1).forEach((p) => hidden.add(p.id));
+    }
+    // снимки соседнего времени: не лезут на текущие и не громоздятся друг на друга (остаётся ближайший по времени)
+    const leaders = list.map((g) => ({ p: g[0], r: g.length > 1 ? IN_HALO : TOUCH }));
+    const kept: Photo[] = [];
+    const covered = new Set<string>();
+    near
+      .filter((o) => !isActive(o.minutes))
+      .sort((a, b) => Math.abs(a.minutes - centre) - Math.abs(b.minutes - centre))
+      .forEach((o) => {
+        if (leaders.some((l) => d(o.p, l.p) < l.r) || kept.some((k) => d(o.p, k) < TOUCH)) covered.add(o.p.id);
+        else kept.push(o.p);
+      });
     const fanIds = new Set(fan?.photos.map((p) => p.id));
     const pins: Pin[] = near.map((o) => {
-      const active = isActive(o.minutes);
-      const a = xy.get(o.p.id)!;
-      const covered = !active && leaders.some((b) => Math.hypot(a.x - b.x, a.y - b.y) < PIN);
       const g = groups.get(o.p.id);
       return {
         photo: o.p,
         minutes: o.minutes,
-        active,
-        suppressed: hidden.has(o.p.id) || covered || fanIds.has(o.p.id),
+        active: isActive(o.minutes),
+        suppressed: hidden.has(o.p.id) || covered.has(o.p.id) || fanIds.has(o.p.id),
         badge: g ? g.length - 1 : 0,
         under1: g?.[1]?.storage_path,
         under2: g?.[2]?.storage_path,
@@ -250,6 +287,23 @@ export default function MapScreen() {
   };
 
   const inWindow = counts[index] ?? 0;
+  // B1: кто снимал в этот момент — аватары и счётчик под шкалой
+  const windowPhotos = useMemo(() => {
+    const ms = day.getTime();
+    return photos.filter((p) => Math.floor((new Date(p.taken_at).getTime() - ms) / 60000 / STEP_MIN) === index);
+  }, [photos, day, index]);
+  const windowAuthors = useMemo(() => Array.from(new Map(windowPhotos.map((p) => [p.user_id, p])).values()), [windowPhotos]);
+  // B1: в поиске — название места в центре карты (по ближайшему снимку)
+  const placeName = useMemo(() => {
+    let best: Photo | null = null, bd = Infinity;
+    for (const p of photos) {
+      if (!p.place_name) continue;
+      const dd = (p.lat - region.latitude) ** 2 + (p.lng - region.longitude) ** 2;
+      if (dd < bd) (bd = dd), (best = p);
+    }
+    const r = region.latitudeDelta / 2;
+    return best && bd < r * r ? best.place_name : null;
+  }, [photos, region]);
   const dayTotal = photos.length;
   const isToday = day.getTime() === today.getTime();
   const sheetBottom = Math.max(insets.bottom, 12) + TAB_BAR_SPACE;
@@ -280,14 +334,23 @@ export default function MapScreen() {
 
       {size.w > 0 && <MomentLayer pins={pins} region={regionSV} width={size.w} height={size.h} now={now} onPress={onPinPress} />}
 
-      {/* Верх: поиск и «где я» */}
+      {/* Верх: поиск (название места) и слои — B1 */}
       <View style={[styles.top, { top: insets.top + 8 }]} pointerEvents="box-none">
         <Pressable style={styles.search} onPress={() => Alert.alert('Поиск мест', 'Появится в следующем шаге.')}>
-          <Icon name="search" size={18} color={D.ink60} />
-          <Text style={styles.searchText}>Найти место</Text>
+          <Icon name="search" size={20} color={D.ink} />
+          <Text style={[styles.searchText, !placeName && { color: D.ink60 }]} numberOfLines={1}>
+            {placeName ?? 'Найти место'}
+          </Text>
         </Pressable>
-        <RoundButton icon="locate" label="Где я" onPress={locateMe} />
+        <RoundButton icon="layers" size={46} label="Слои" onPress={() => {}} />
       </View>
+
+      {/* «Где я» — справа над шкалой — B1 */}
+      {sheet.h > 0 && (
+        <View style={[styles.locate, { bottom: sheetBottom + sheet.h + 18 }]} pointerEvents="box-none">
+          <RoundButton icon="locate" label="Где я" onPress={locateMe} />
+        </View>
+      )}
 
       {offline && (
         <Animated.View entering={FadeIn} exiting={FadeOut} style={[styles.banner, { top: insets.top + 64 }]}>
@@ -311,6 +374,24 @@ export default function MapScreen() {
           index={indexSV}
           onIndexChange={setIndex}
           jumpTo={jump}
+          footer={
+            inWindow > 0 ? (
+              <View style={styles.summary}>
+                <View style={styles.summaryAvas}>
+                  {windowAuthors.slice(0, 4).map((p, k) =>
+                    p.author_avatar ? (
+                      <Image key={p.user_id} source={{ uri: p.author_avatar }} style={[styles.summaryAva, { marginLeft: k ? -8 : 0, zIndex: 10 - k }]} />
+                    ) : (
+                      <View key={p.user_id} style={[styles.summaryAva, { marginLeft: k ? -8 : 0, zIndex: 10 - k, backgroundColor: D.sun }]} />
+                    ),
+                  )}
+                </View>
+                <Text style={styles.summaryText} numberOfLines={1}>
+                  {inWindow} фото · {windowAuthors.length} {plural(windowAuthors.length, 'автор', 'автора', 'авторов')} в этот момент
+                </Text>
+              </View>
+            ) : null
+          }
           header={
             <View style={styles.head}>
               <View style={styles.dayRow}>
@@ -335,9 +416,9 @@ export default function MapScreen() {
               <View style={styles.timeRow}>
                 <RollingTime index={indexSV} step={STEP_MIN} size={50} />
                 <View style={styles.timeMeta}>
-                  <Text style={styles.until}>–{hhmm((index + 1) * STEP_MIN)}</Text>
-                  <Text style={styles.count}>
-                    {inWindow} фото · {mood(inWindow)}
+                  <Text style={styles.until}>
+                    –{hhmm((index + 1) * STEP_MIN)}
+                    {inWindow === 0 ? ' · 0 фото' : ''}
                   </Text>
                 </View>
               </View>
@@ -383,9 +464,15 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: D.mapBase },
   top: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 1000, elevation: 30 },
   search: {
-    flex: 1, height: 46, borderRadius: 23, backgroundColor: D.white, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, ...softShadow,
+    flex: 1, height: 46, borderRadius: 23, backgroundColor: D.white, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16,
+    shadowColor: '#17120D', shadowOpacity: 0.12, shadowRadius: 9, shadowOffset: { width: 0, height: 6 }, elevation: 6,
   },
-  searchText: { fontFamily: F.sansMedium, fontSize: 15, color: D.ink60 },
+  searchText: { flex: 1, fontFamily: F.sansMedium, fontSize: 15, color: D.ink },
+  locate: { position: 'absolute', right: 16, zIndex: 1000, elevation: 30 },
+  summary: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, marginTop: 8, marginBottom: 6 },
+  summaryAvas: { flexDirection: 'row' },
+  summaryAva: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: D.white, margin: -2 },
+  summaryText: { flex: 1, fontFamily: F.sansMedium, fontSize: 13, color: D.ink },
   banner: { position: 'absolute', alignSelf: 'center', backgroundColor: D.ink, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, zIndex: 1000, elevation: 30 },
   bannerText: { fontFamily: F.sansMedium, fontSize: 13, color: D.paper },
   empty: {
@@ -403,6 +490,5 @@ const styles = StyleSheet.create({
   todayText: { fontFamily: F.sansSemi, fontSize: 12, color: D.sun },
   timeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, marginBottom: 8, marginLeft: -4 },
   timeMeta: { marginLeft: 12, marginTop: 8 },
-  until: { fontFamily: F.sans, fontSize: 17, color: D.ink60 },
-  count: { fontFamily: F.sansSemi, fontSize: 13, color: D.ink, marginTop: 2 },
+  until: { fontFamily: F.sans, fontSize: 18, color: D.ink60 },
 });

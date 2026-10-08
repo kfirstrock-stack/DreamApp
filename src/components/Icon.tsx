@@ -9,7 +9,7 @@ const ICONS = {
   grid: { ios: 'square.grid.2x2', android: 'grid_view' },
   map: { ios: 'map', android: 'map' },
   clock: { ios: 'clock', android: 'schedule' },
-  locate: { ios: 'location', android: 'my_location' },
+  locate: { ios: 'scope', android: 'my_location' },
   info: { ios: 'info.circle', android: 'info' },
   people: { ios: 'person.2', android: 'groups' },
   back: { ios: 'chevron.left', android: 'arrow_back_ios_new' },

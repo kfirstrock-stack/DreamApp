@@ -27,7 +27,7 @@ type Props = {
 };
 
 export const PIN = 56;
-const HALO = 150; // «зона момента» вокруг стопки
+export const HALO = 150; // «зона момента» вокруг стопки
 
 type PinProps = Pin & { region: SharedValue<MapRegion>; width: number; height: number; now: SharedValue<number>; onPress: (p: Photo) => void };
 
