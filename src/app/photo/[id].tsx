@@ -11,6 +11,7 @@ import Animated, {
   FadeOut,
   SlideInDown,
   SlideOutDown,
+  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -18,6 +19,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
 import { MomentStrip, stripRange } from '@/components/photo/MomentStrip';
@@ -45,6 +47,7 @@ const ago = (d: Date) => {
 
 // Снимок двигается плавно, без пружины (пружина — только у панелей)
 const SMOOTH = { duration: 320, easing: Easing.out(Easing.cubic) };
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 // Панель автора помним открытой/свёрнутой между снимками
 let sheetOpenPref = true;
@@ -347,8 +350,13 @@ export default function PhotoScreen() {
   };
   const bodyStyle = useAnimatedStyle(() => ({ opacity: Math.pow(openness(), 2) }));
   // ручка: открыто — ровная черта, свёрнуто — стрелка «вверх»
-  const gripL = useAnimatedStyle(() => ({ transform: [{ rotate: `${-18 * (1 - openness())}deg` }] }));
-  const gripR = useAnimatedStyle(() => ({ transform: [{ rotate: `${18 * (1 - openness())}deg` }] }));
+  // P2: та же дуга, что у язычка шкалы — открыто: дуга вниз, свёрнуто: дуга вверх, между ними плавный перегиб
+  const gripArc = useAnimatedProps(() => {
+    const t = 2 * openness() - 1;
+    const a = 1.75 * (1 - t);
+    const b = 1.75 * (1 + t);
+    return { d: `M 1.5 ${a + 1.5} C 8.5 ${b + 1.5} 16.5 ${b + 1.5} 23.5 ${a + 1.5}` };
+  });
 
   if (failed === 'error' && !photo) {
     return (
@@ -508,8 +516,9 @@ export default function PhotoScreen() {
               }}
             >
               <Pressable onPress={toggleSheet} style={styles.grip} hitSlop={{ top: 10, bottom: 6 }} accessibilityRole="button" accessibilityLabel={open ? 'Свернуть подробности' : 'Показать подробности'}>
-                <Animated.View style={[styles.gripHalf, { marginRight: -1.5 }, gripL]} />
-                <Animated.View style={[styles.gripHalf, { marginLeft: -1.5 }, gripR]} />
+                <Svg width={25} height={8}>
+                  <AnimatedPath animatedProps={gripArc} stroke="rgba(244,239,230,0.55)" strokeWidth={2} strokeLinecap="round" fill="none" />
+                </Svg>
               </Pressable>
               <View style={styles.authorRow}>
                 {photo.author_avatar ? <Image source={{ uri: photo.author_avatar }} style={styles.avatar} /> : <View style={[styles.avatar, { backgroundColor: D.sun }]} />}
@@ -676,8 +685,7 @@ const styles = StyleSheet.create({
   topRow: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', zIndex: 10 },
   zone: { height: 160 }, // 160 px градиента над панелью (+28 уходят под её скругление)
   sheet: { backgroundColor: D.night2, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20 },
-  grip: { height: 28, flexDirection: 'row', justifyContent: 'center', paddingTop: 10 },
-  gripHalf: { width: 19.5, height: 4, borderRadius: 2, backgroundColor: 'rgba(244,239,230,0.2)' },
+  grip: { height: 28, flexDirection: 'row', justifyContent: 'center', paddingTop: 9 },
   strip: { marginTop: 18 },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: { width: 44, height: 44, borderRadius: 22 },
