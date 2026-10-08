@@ -26,7 +26,8 @@ type Props = {
   onPress: (photo: Photo) => void;
 };
 
-export const PIN = 56;
+export const PIN = 58; // одиночный снимок (B1: 58), стопка — 62
+const STACK = 62;
 export const HALO = 150; // «зона момента» вокруг стопки
 
 type PinProps = Pin & { region: SharedValue<MapRegion>; width: number; height: number; now: SharedValue<number>; onPress: (p: Photo) => void };
@@ -65,7 +66,7 @@ const MomentPin = memo(function MomentPin({ photo, minutes, active, suppressed, 
             </View>
           </>
         )}
-        <View style={[styles.frame, { borderColor: active ? D.sun : D.white }]}>
+        <View style={[styles.frame, stack && styles.stackFrame, { borderColor: active ? D.sun : D.white }]}>
           <Image source={photoSource(photo.storage_path)} style={styles.img} contentFit="cover" cachePolicy="memory-disk" recyclingKey={photo.id} />
           <Animated.View style={[styles.fill, { backgroundColor: D.paper }, veil]} />
         </View>
@@ -74,7 +75,7 @@ const MomentPin = memo(function MomentPin({ photo, minutes, active, suppressed, 
             <Text style={styles.badgeText}>+{badge}</Text>
           </View>
         )}
-        <View style={[styles.chip, { backgroundColor: active ? D.sun : D.ink }]}>
+        <View style={[styles.chip, stack && { marginTop: 8 }, { backgroundColor: active ? D.sun : D.ink }]}>
           <Text style={styles.chipText}>{time}</Text>
         </View>
       </Pressable>
@@ -103,17 +104,19 @@ const styles = StyleSheet.create({
   },
   frame: {
     width: PIN, height: PIN, borderRadius: 16, borderWidth: 3, overflow: 'hidden', backgroundColor: D.paper2,
-    shadowColor: '#17120D', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6,
+    shadowColor: '#17120D', shadowOpacity: 0.25, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 6,
   },
-  back: { position: 'absolute', top: 0, left: 0, borderColor: D.white },
-  backA: { transform: [{ translateX: -7 }, { translateY: 5 }, { rotate: '-10deg' }] },
-  backB: { transform: [{ translateX: 7 }, { translateY: -4 }, { rotate: '8deg' }] },
+  // B1: задние карточки выглядывают слева-снизу (+10°) и справа-сверху (−8°)
+  back: { position: 'absolute', top: 0, left: (PIN - STACK) / 2, width: STACK, height: STACK, borderColor: D.white },
+  backA: { transform: [{ translateX: -12 }, { translateY: 9 }, { rotate: '10deg' }] },
+  backB: { transform: [{ translateX: 8 }, { translateY: -11 }, { rotate: '-8deg' }] },
+  stackFrame: { width: STACK, height: STACK, marginHorizontal: (PIN - STACK) / 2, borderWidth: 3.5 },
   img: { width: '100%', height: '100%' },
   badge: {
-    position: 'absolute', top: -9, right: -12, minWidth: 28, height: 24, paddingHorizontal: 7, borderRadius: 12,
-    backgroundColor: D.sun, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: D.white,
+    position: 'absolute', top: -6, right: -12, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+    backgroundColor: D.sun, alignItems: 'center', justifyContent: 'center',
   },
-  badgeText: { fontFamily: F.mono, fontSize: 12, color: D.white },
-  chip: { alignSelf: 'center', marginTop: 5, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
+  badgeText: { fontFamily: F.mono, fontSize: 11, color: D.white },
+  chip: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
   chipText: { fontFamily: F.mono, fontSize: 10, color: D.white },
 });

@@ -60,7 +60,7 @@ export function RoundButton({ icon, onPress, size = 44, tone = 'light', label, s
     >
       <Animated.View style={anim}>
         {glass ? (
-          <GlassView glassEffectStyle="regular" colorScheme="dark" isInteractive style={[styles.base, dims]}>
+          <GlassView glassEffectStyle="regular" colorScheme="dark" tintColor="rgba(15,14,12,0.45)" isInteractive style={[styles.base, dims]}>
             <Icon name={icon} size={size * 0.42} color={t.fg} />
           </GlassView>
         ) : (

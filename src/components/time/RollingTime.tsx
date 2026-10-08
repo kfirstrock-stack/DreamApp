@@ -53,15 +53,23 @@ function RollingDigit({ index, step, place, size, color }: { index: SharedValue<
   useAnimatedReaction(
     () => index.value,
     (i, prev) => {
-      if (prev === null || i === prev) return;
-      const from = digitAt(prev, step, place);
       const to = digitAt(i, step, place);
-      if (from === to) return;
+      // всегда сверяемся с тем, что реально показано, — барабан не может «потеряться»
+      if (!Number.isFinite(target.value)) {
+        target.value = to;
+        pos.value = to;
+        return;
+      }
+      const cur = wrap10(Math.round(target.value));
+      if (prev === null || !Number.isFinite(pos.value)) pos.value = target.value; // при монтировании — без анимации
+      if (cur === to) return;
       // Вперёд по времени — барабан крутится вверх, назад — вниз; всегда коротким путём по кругу
-      const steps = i > prev ? (to - from + 10) % 10 : -((from - to + 10) % 10);
+      const forward = prev === null || i >= prev;
+      const steps = forward ? (to - cur + 10) % 10 : -((cur - to + 10) % 10);
       target.value += steps;
-      pos.value = reduce ? target.value : withTiming(target.value, ROLL);
+      pos.value = reduce || prev === null ? target.value : withTiming(target.value, ROLL);
     },
+    [step, place, reduce],
   );
 
   const column = useAnimatedStyle(() => ({ transform: [{ translateY: -(wrap10(pos.value) + 10) * h }] }));

@@ -19,16 +19,29 @@ const MON_GEN = ['января', 'февраля', 'марта', 'апреля',
 const MON_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 const MON_NOM = ['ЯНВАРЬ', 'ФЕВРАЛЬ', 'МАРТ', 'АПРЕЛЬ', 'МАЙ', 'ИЮНЬ', 'ИЮЛЬ', 'АВГУСТ', 'СЕНТЯБРЬ', 'ОКТЯБРЬ', 'НОЯБРЬ', 'ДЕКАБРЬ'];
 
+// Недели — по ISO: с понедельника, первая неделя года — та, где 4 января
+const isoWeek1 = (year: number) => {
+  const j4 = new Date(year, 0, 4);
+  return new Date(year, 0, 4 - ((j4.getDay() + 6) % 7));
+};
+const isoYearOf = (d: Date) => {
+  const y = d.getFullYear();
+  if (d >= isoWeek1(y + 1)) return y + 1;
+  if (d < isoWeek1(y)) return y - 1;
+  return y;
+};
+const isoYearOfStart = (start: Date) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + 3).getFullYear();
+
 /** Начало диапазона, в котором лежит момент */
 export function rangeStart(step: Step, at: Date) {
   if (step === 'day') return new Date(at.getFullYear(), at.getMonth(), 1);
-  if (step === 'week') return new Date(at.getFullYear(), 0, 1);
+  if (step === 'week') return isoWeek1(isoYearOf(at));
   return new Date(at.getFullYear(), at.getMonth(), at.getDate());
 }
 /** Начало соседнего диапазона: −1 / +1 сутки, месяц или год */
 export function shiftRange(step: Step, start: Date, dir: number) {
   if (step === 'day') return new Date(start.getFullYear(), start.getMonth() + dir, 1);
-  if (step === 'week') return new Date(start.getFullYear() + dir, 0, 1);
+  if (step === 'week') return isoWeek1(isoYearOfStart(start) + dir);
   return new Date(start.getFullYear(), start.getMonth(), start.getDate() + dir);
 }
 export const rangeEnd = (step: Step, start: Date) => shiftRange(step, start, 1);
@@ -45,7 +58,7 @@ export function bucketStart(step: Step, start: Date, i: number) {
   if (step === '15m') return new Date(y, m, d, 0, i * 15);
   if (step === 'hour') return new Date(y, m, d, i);
   if (step === 'day') return new Date(y, m, 1 + i);
-  return new Date(y, 0, 1 + i * 7);
+  return new Date(y, m, d + i * 7);
 }
 /** Положение момента на шкале в столбиках (дробное) */
 export function position(step: Step, start: Date, t: Date) {
@@ -65,15 +78,14 @@ export const isCurrentRange = (step: Step, start: Date, now = new Date()) => now
 /** Строка над временем: «ЧТ, 8 ОКТ 2026» / «ОКТЯБРЬ 2026» / «2026» */
 export function rangeLabel(step: Step, start: Date) {
   if (step === 'day') return `${MON_NOM[start.getMonth()]} ${start.getFullYear()}`;
-  if (step === 'week') return String(start.getFullYear());
+  if (step === 'week') return String(isoYearOfStart(start));
   return `${WD[start.getDay()]}, ${start.getDate()} ${MON3[start.getMonth()]} ${start.getFullYear()}`;
 }
 /** Крупная надпись для дня и недели (15 мин и час — барабан цифр) */
 export function bigLabel(step: Step, start: Date, i: number) {
   const a = bucketStart(step, start, i);
   if (step === 'day') return `${a.getDate()} ${MON_GEN[a.getMonth()]}`;
-  const b = new Date(bucketStart(step, start, i + 1).getTime() - 86400000);
-  const last = b.getFullYear() > a.getFullYear() ? new Date(a.getFullYear(), 11, 31) : b;
+  const last = new Date(a.getFullYear(), a.getMonth(), a.getDate() + 6);
   return a.getMonth() === last.getMonth()
     ? `${a.getDate()}–${last.getDate()} ${MON_SHORT[a.getMonth()]}`
     : `${a.getDate()} ${MON_SHORT[a.getMonth()]}–${last.getDate()} ${MON_SHORT[last.getMonth()]}`;
@@ -98,12 +110,12 @@ export function ticks(step: Step, start: Date): { i: number; label: string }[] {
   const n = bucketCount(step, start);
   const out: { i: number; label: string }[] = [];
   if (step === '15m') for (let i = 0; i <= n; i += 8) out.push({ i, label: `${pad(i / 4)}:00` });
-  else if (step === 'hour') for (let i = 0; i <= n; i += 3) out.push({ i, label: `${pad(i)}:00` });
+  else if (step === 'hour') for (let i = 0; i <= n; i += 6) out.push({ i, label: `${pad(i)}:00` }); // M3: 00 · 06 · 12 · 18 · 24
   else if (step === 'day') for (let i = 0; i < n; i += 7) out.push({ i, label: String(i + 1) });
   else
     for (let m = 0; m < 12; m++) {
-      const d = new Date(start.getFullYear(), m, 1);
-      out.push({ i: Math.floor((d.getTime() - start.getTime()) / (7 * 86400000)), label: MON_TICK[m] });
+      const d = new Date(isoYearOfStart(start), m, 1);
+      out.push({ i: Math.max(0, Math.floor((d.getTime() - start.getTime()) / (7 * 86400000))), label: MON_TICK[m] });
     }
   return out;
 }

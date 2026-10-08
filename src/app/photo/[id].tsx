@@ -24,7 +24,7 @@ import { MomentStrip, stripRange } from '@/components/photo/MomentStrip';
 import { PillButton } from '@/components/ui/PillButton';
 import { RoundButton } from '@/components/ui/RoundButton';
 import { useAuth } from '@/lib/auth';
-import { D, F, STEP_MIN } from '@/lib/design';
+import { D, F, SHEET_SPRING, STEP_MIN } from '@/lib/design';
 import {
   boundsAround, cachedPhoto, deletePhoto, fetchPhotoFull, fetchPhotosV2, hideAuthor, photoSource, reportPhoto, setLike, type ReportReason,
 } from '@/lib/photos';
@@ -140,7 +140,6 @@ export default function PhotoScreen() {
   const offStart = useSharedValue(0);
   const openSV = useSharedValue(sheetOpenPref ? 1 : 0);
   const enter = useSharedValue(1); // выезд панели при открытии: 1 — за краем экрана, 0 — на месте
-  const SHEET_SPRING = { damping: 20, stiffness: 210, mass: 0.8 };
   const remember = useCallback((o: boolean) => {
     sheetOpenPref = o;
     setOpen(o);
@@ -488,7 +487,7 @@ export default function PhotoScreen() {
               const h = e.nativeEvent.layout.height;
               const first = sheetFull.value === 0;
               sheetFull.value = h;
-              if (first) enter.value = withSpring(0, { damping: 16, stiffness: 140, mass: 0.9 });
+              if (first) enter.value = withSpring(0, SHEET_SPRING);
               if (openSV.value === 0) off.value = first ? Math.max(0, h - sheetPeek.value) : withTiming(Math.max(0, h - sheetPeek.value));
             }}
           >
@@ -578,7 +577,7 @@ export default function PhotoScreen() {
       {menu && (
         <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(150)} style={styles.backdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenu(null)} />
-          <Animated.View entering={SlideInDown.springify().damping(20)} exiting={SlideOutDown.duration(180)} style={[styles.menu, { paddingBottom: insets.bottom + 16 }]}>
+          <Animated.View entering={SlideInDown.springify().damping(SHEET_SPRING.damping).stiffness(SHEET_SPRING.stiffness).mass(SHEET_SPRING.mass)} exiting={SlideOutDown.duration(220)} style={[styles.menu, { paddingBottom: insets.bottom + 16 }]}>
             <View style={styles.handle} />
             {menu === 'actions' ? (
               <>

@@ -17,6 +17,7 @@ import { D, F, STEP_MIN } from '@/lib/design';
 export const ITEM = 11; // шаг между столбиками, px
 const BAR_W = 6;
 const MAX_H = 52;
+const INSET = 20;
 
 type Props = {
   counts: number[];
@@ -50,7 +51,7 @@ export const TimeScrubber = memo(function TimeScrubber({
 }: Props) {
   const BUCKETS = counts.length;
   const { width } = useWindowDimensions();
-  const innerW = width - sidePadding * 2;
+  const innerW = width - sidePadding * 2 - INSET * 2; // B1: шкала с отступом 20 от краёв карточки
   const center = innerW / 2;
   const maxX = (BUCKETS - 1) * ITEM;
   const x = useSharedValue(initialIndex * ITEM);
@@ -137,7 +138,7 @@ export const TimeScrubber = memo(function TimeScrubber({
       .maxDistance(6)
       .onEnd((e) => {
         if (caught.value || e.y < barsTop.value) return;
-        const t = Math.min(maxX, Math.max(0, Math.round((x.value + (e.x - center)) / ITEM) * ITEM));
+        const t = Math.min(maxX, Math.max(0, Math.round((x.value + (e.x - INSET - center)) / ITEM) * ITEM));
         moving.value = true;
         x.value = withSpring(t, { damping: 26, stiffness: 180, mass: 0.8 }, (done) => {
           if (done) moving.value = false;
@@ -183,7 +184,7 @@ export const TimeScrubber = memo(function TimeScrubber({
 
 const H = Math.round(MAX_H * 1.3) + 4;
 const styles = StyleSheet.create({
-  wrap: { height: H + 28, overflow: 'hidden' },
+  wrap: { height: H + 28, overflow: 'hidden', marginHorizontal: INSET },
   content: { position: 'absolute', left: 0, top: 0 },
   bars: { flexDirection: 'row', alignItems: 'flex-end', height: H },
   slot: { width: ITEM, alignItems: 'center', justifyContent: 'flex-end' },

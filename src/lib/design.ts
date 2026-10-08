@@ -43,3 +43,6 @@ export const lightShadow = {
 // Шаг шкалы времени — 15 минут, 96 интервалов в сутках
 export const STEP_MIN = 15;
 export const BUCKETS = (24 * 60) / STEP_MIN;
+
+// Выезд нижних панелей: плавно, с лёгким «докатом» (затухание ≈ 0.78 — отскок около 2%)
+export const SHEET_SPRING = { damping: 22, stiffness: 200, mass: 1 };
