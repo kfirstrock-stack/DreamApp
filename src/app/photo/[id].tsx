@@ -100,6 +100,7 @@ export default function PhotoScreen() {
     if (on === photo.liked_by_me) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     heart.value = withSequence(withSpring(1.35, { damping: 6, stiffness: 400 }), withSpring(1, { damping: 10 }));
+    if (on) burst.value = withSequence(withTiming(1, { duration: 120 }), withTiming(0, { duration: 450 })); // сердце вспыхивает и на снимке
     const prev = photo;
     setPhoto({ ...photo, liked_by_me: on, like_count: Math.max(0, (photo.like_count ?? 0) + (on ? 1 : -1)) });
     try {
@@ -109,7 +110,7 @@ export default function PhotoScreen() {
     }
   };
 
-  // Полноэкранный просмотр: тап — спрятать всё, щипок/двойной тап — приблизить, свайп вниз — закрыть
+  // Просмотр: тап — спрятать интерфейс, двойной тап/щипок — полный кадр с приближением, свайп вниз — закрыть
   const [full, setFull] = useState(false);
   const fullP = useSharedValue(0); // 0 — обычный вид, 1 — полный экран
   const fullSV = useSharedValue(0);
@@ -168,6 +169,20 @@ export default function PhotoScreen() {
     [], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const chromeAway = useSharedValue(0); // 1 — кнопки уехали наверх (пока щипаем или тянем фото)
+  // Тап по фото прячет интерфейс: кнопки — вверх, панель — вниз; ещё тап — возвращает
+  const [uiHidden, setUiHidden] = useState(false);
+  const hideSV = useSharedValue(0);
+  const hideP = useSharedValue(0);
+  const setUi = useCallback(
+    (hide: boolean) => {
+      setUiHidden(hide);
+      hideSV.value = hide ? 1 : 0;
+      hideP.value = hide
+        ? withTiming(1, { duration: 240, easing: Easing.out(Easing.cubic) })
+        : withSpring(0, { damping: 16, stiffness: 180, mass: 0.8 });
+    },
+    [hideSV, hideP],
+  );
 
   const setFullMode = useCallback(
     (on: boolean) => {
@@ -175,6 +190,7 @@ export default function PhotoScreen() {
       fullSV.value = on ? 1 : 0;
       fullP.value = withTiming(on ? 1 : 0, { duration: 300, easing: Easing.out(Easing.cubic) });
       if (!on) {
+        setUi(false); // из полного кадра возвращаемся к обычному виду со всем интерфейсом
         scale.value = withTiming(1);
         tx.value = withTiming(0);
         ty.value = withTiming(0);
@@ -183,22 +199,25 @@ export default function PhotoScreen() {
         savedTy.value = 0;
       }
     },
-    [fullP, fullSV, scale, tx, ty, savedScale, savedTx, savedTy],
+    [fullP, fullSV, scale, tx, ty, savedScale, savedTx, savedTy, setUi],
   );
-  const toggleFull = useCallback(() => setFullMode(fullSV.value === 0), [setFullMode, fullSV]);
+  // Одинарный тап: в полном кадре — вернуться к обычному виду, иначе — спрятать/показать интерфейс
+  const onSingleTap = useCallback(() => {
+    if (fullSV.value === 1) setFullMode(false);
+    else setUi(hideSV.value === 0);
+  }, [fullSV, hideSV, setFullMode, setUi]);
   const goBack = useCallback(() => router.back(), []);
 
   const gesture = useMemo(() => {
-    const single = Gesture.Tap().onEnd(() => scheduleOnRN(toggleFull));
+    const single = Gesture.Tap().onEnd(() => scheduleOnRN(onSingleTap));
     const double = Gesture.Tap()
       .numberOfTaps(2)
       .onEnd((e) => {
+        // Двойной тап: полный кадр и приближение к точке касания; повторный — отдалить
         if (fullSV.value === 0) {
-          burst.value = withSequence(withTiming(1, { duration: 120 }), withTiming(0, { duration: 450 }));
-          scheduleOnRN(toggleLike, true);
-          return;
-        }
-        if (scale.value > 1.05) {
+          fullSV.value = 1;
+          scheduleOnRN(setFullMode, true);
+        } else if (scale.value > 1.05) {
           scale.value = withSpring(1, { damping: 18 });
           tx.value = withSpring(0, { damping: 18 });
           ty.value = withSpring(0, { damping: 18 });
@@ -282,7 +301,7 @@ export default function PhotoScreen() {
         }
       });
     return Gesture.Race(Gesture.Simultaneous(pinch, pan), Gesture.Exclusive(double, single));
-  }, [toggleFull, setFullMode, goBack, toggleLike, width, height]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [onSingleTap, setFullMode, goBack, width, height]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const viewerStyle = useAnimatedStyle(() => {
     const k = Math.min(1, drag.value / (height * 0.6));
@@ -294,13 +313,13 @@ export default function PhotoScreen() {
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
   }));
   const chromeStyle = useAnimatedStyle(() => {
-    const k = Math.max(fullP.value, chromeAway.value);
+    const k = Math.max(fullP.value, chromeAway.value, hideP.value);
     return { transform: [{ translateY: -k * (insets.top + 80) }, { scale: 1 - k * 0.15 }] };
   });
-  const shadeStyle = useAnimatedStyle(() => ({ opacity: 1 - chromeAway.value }));
+  const shadeStyle = useAnimatedStyle(() => ({ opacity: 1 - Math.max(chromeAway.value, hideP.value) }));
   const sheetStyle = useAnimatedStyle(() => ({
     opacity: 1 - Math.min(1, drag.value / 150),
-    transform: [{ translateY: off.value + fullP.value * (sheetFull.value + 40) }],
+    transform: [{ translateY: off.value + Math.max(fullP.value, hideP.value) * (sheetFull.value - off.value + 40) }],
   }));
   // насколько панель открыта: 0…1
   const openness = () => {
@@ -314,8 +333,8 @@ export default function PhotoScreen() {
   const gripR = useAnimatedStyle(() => ({ transform: [{ rotate: `${18 * (1 - openness())}deg` }] }));
   // дата и нижнее затемнение едут вместе с верхним краем панели
   const riseStyle = useAnimatedStyle(() => ({
-    opacity: 1 - fullP.value,
-    transform: [{ translateY: -(sheetFull.value - off.value) }],
+    opacity: 1 - Math.max(fullP.value, hideP.value),
+    transform: [{ translateY: -(sheetFull.value - off.value) * (1 - hideP.value) }],
   }));
 
   if (failed === 'error' && !photo) {
@@ -380,7 +399,7 @@ export default function PhotoScreen() {
 
   return (
     <View style={styles.root}>
-      <StatusBar style="light" hidden={full} animated />
+      <StatusBar style="light" hidden={full || uiHidden} animated />
       <GestureDetector gesture={gesture}>
         <Animated.View style={[styles.viewer, viewerStyle]} collapsable={false}>
           {/* Обычный вид: снимок над панелью автора */}
@@ -421,7 +440,7 @@ export default function PhotoScreen() {
         </Animated.View>
       </GestureDetector>
 
-      <Animated.View style={[styles.topRow, { top: insets.top + 8 }, chromeStyle]} pointerEvents={full ? 'none' : 'box-none'}>
+      <Animated.View style={[styles.topRow, { top: insets.top + 8 }, chromeStyle]} pointerEvents={full || uiHidden ? 'none' : 'box-none'}>
         <RoundButton icon="back" tone="glass" label="Назад" onPress={() => router.back()} />
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <RoundButton icon="share" tone="glass" label="Поделиться" onPress={() => Share.share({ message: `Момент в DreamApp: ${photo.place_name ?? ''}, ${stamp(taken)}` })} />
@@ -429,7 +448,7 @@ export default function PhotoScreen() {
         </View>
       </Animated.View>
 
-      <Animated.View entering={SlideInDown.springify().damping(16).stiffness(140).mass(0.9)} style={styles.sheetWrap} pointerEvents={full ? 'none' : 'box-none'}>
+      <Animated.View entering={SlideInDown.springify().damping(16).stiffness(140).mass(0.9)} style={styles.sheetWrap} pointerEvents={full || uiHidden ? 'none' : 'box-none'}>
         <GestureDetector gesture={sheetPan}>
           <Animated.View
             style={[styles.sheet, { paddingBottom: insets.bottom + 12 }, sheetStyle]}
