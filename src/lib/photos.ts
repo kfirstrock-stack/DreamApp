@@ -1,4 +1,5 @@
 import { decode } from 'base64-arraybuffer';
+import { DEMO_IMAGES } from './demoImages';
 import { supabase } from './supabase';
 import { STEP_INTERVAL, type Granularity } from './time';
 import type { Bounds, Photo, TimeWindow } from './types';
@@ -7,6 +8,15 @@ import type { Bounds, Photo, TimeWindow } from './types';
 const cache = new Map<string, Photo>();
 export const cachePhotos = (list: Photo[]) => list.forEach((p) => cache.set(p.id, p));
 export const cachedPhoto = (id: string) => cache.get(id);
+
+/** Источник картинки для expo-image: демо-снимки лежат в самом приложении (demo://demo-01) */
+export function photoSource(path: string): number | { uri: string } {
+  if (path.startsWith('demo://')) {
+    const local = DEMO_IMAGES[path.slice('demo://'.length)];
+    if (local) return local;
+  }
+  return { uri: photoUrl(path) };
+}
 
 export function photoUrl(path: string): string {
   if (path.startsWith('http')) return path;

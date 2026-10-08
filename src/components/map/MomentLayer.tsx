@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import { D, F } from '@/lib/design';
 import { project, type MapRegion } from '@/lib/geo';
-import { photoUrl } from '@/lib/photos';
+import { photoSource } from '@/lib/photos';
 import type { Photo } from '@/lib/types';
 
 export type Pin = {
@@ -51,7 +51,7 @@ const MomentPin = memo(function MomentPin({ photo, minutes, active, suppressed, 
       <Pressable onPress={() => onPress(photo, badge > 0)} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Фото в ${time}${badge ? `, ещё ${badge}` : ''}`}>
         {badge > 0 && <View style={[styles.frame, styles.under]} />}
         <View style={[styles.frame, { borderColor: active ? D.sun : D.white }]}>
-          <Image source={{ uri: photoUrl(photo.storage_path) }} style={styles.img} contentFit="cover" cachePolicy="memory-disk" recyclingKey={photo.id} />
+          <Image source={photoSource(photo.storage_path)} style={styles.img} contentFit="cover" cachePolicy="memory-disk" recyclingKey={photo.id} />
           <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: D.paper }, veil]} />
         </View>
         {badge > 0 && (

@@ -10,7 +10,7 @@ import { TAB_BAR_SPACE, TabBar } from '@/components/ui/TabBar';
 import { useAuth } from '@/lib/auth';
 import { D, F, STEP_MIN, lightShadow } from '@/lib/design';
 import { requestMapFocus } from '@/lib/focus';
-import { boundsAround, fetchPhotosV2, photoUrl } from '@/lib/photos';
+import { boundsAround, fetchPhotosV2, photoSource } from '@/lib/photos';
 import type { Photo } from '@/lib/types';
 
 const STEP = STEP_MIN * 60000;
@@ -124,7 +124,7 @@ export default function MomentScreen() {
                   layout={LinearTransition}
                 >
                   <Pressable onPress={() => router.push({ pathname: '/photo/[id]', params: { id: p.id } })} style={[styles.card, { height: h }]}>
-                    <Image source={{ uri: photoUrl(p.storage_path) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} recyclingKey={p.id} />
+                    <Image source={photoSource(p.storage_path)} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} recyclingKey={p.id} />
                     <View style={styles.cardMeta}>
                       {p.author_avatar ? <Image source={{ uri: p.author_avatar }} style={styles.ava} /> : <View style={[styles.ava, { backgroundColor: D.sun }]} />}
                       <Text style={styles.cardTime}>{hm(new Date(p.taken_at))}</Text>

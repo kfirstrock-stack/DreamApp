@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { photoUrl } from '@/lib/photos';
+import { photoSource } from '@/lib/photos';
 import { colors, radius, shadow } from '@/lib/theme';
 import { dateTime } from '@/lib/time';
 import type { Photo } from '@/lib/types';
@@ -41,7 +41,7 @@ export function Mosaic({ photos, onOpen, topInset, bottomInset, empty, showMeta 
         <View key={ci} style={{ width: colW, gap }}>
           {col.map(({ p, h }) => (
             <Pressable key={p.id} onPress={() => onOpen(p)} style={[styles.card, { height: h }]}>
-              <Image source={{ uri: photoUrl(p.storage_path) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+              <Image source={photoSource(p.storage_path)} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
               {showMeta && (
                 <View style={styles.meta}>
                   <Text style={styles.metaText} numberOfLines={1}>

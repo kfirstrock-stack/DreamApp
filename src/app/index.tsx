@@ -58,6 +58,7 @@ export default function MapScreen() {
   const { session } = useAuth();
   const mapRef = useRef<MapView>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const [sheet, setSheet] = useState({ y: 0, h: 0 }); // где карточка шкалы — фото ставим выше неё
 
   const regionSV = useSharedValue<MapRegion>(START);
   const [region, setRegion] = useState<MapRegion>(START);
@@ -75,6 +76,23 @@ export default function MapScreen() {
   const [reload, setReload] = useState(0);
   const firstFocus = useRef(true);
 
+  // Регион, при котором точка встаёт посередине свободной зоны — между поиском и карточкой шкалы
+  const focusRegion = useCallback(
+    (lat: number, lng: number, lngDelta = 0.006): MapRegion => {
+      const w = size.w || 393, h = size.h || 852;
+      const latDelta = lngDelta * (h / w) * Math.cos((lat * Math.PI) / 180);
+      const freeTop = insets.top + 74;
+      const freeBottom = (sheet.y || h * 0.55) - 40;
+      const offset = ((freeTop + freeBottom) / 2 - h / 2) / h; // < 0 — выше центра экрана
+      return { latitude: lat + offset * latDelta, longitude: lng, latitudeDelta: latDelta, longitudeDelta: lngDelta };
+    },
+    [size, sheet.y, insets.top],
+  );
+  const flyTo = useCallback(
+    (lat: number, lng: number, lngDelta?: number) => mapRef.current?.animateToRegion(focusRegion(lat, lng, lngDelta), 800),
+    [focusRegion],
+  );
+
   // Перейти к моменту: день + интервал на шкале (шкала доедет сама)
   const goTo = useCallback((at: Date) => {
     const d = startOfDay(at);
@@ -82,24 +100,31 @@ export default function MapScreen() {
     setJump({ i: bucketOf(at, d), key: Date.now() });
   }, []);
 
-  // При старте — к последнему моменту, где здесь есть фото
+  // При старте — к последнему моменту, где здесь есть фото: и карта, и шкала
+  const started = useRef(false);
   useEffect(() => {
-    fetchLatestIn(regionBounds(START, 1.5))
-      .then((p) => p && goTo(new Date(p.taken_at)))
+    if (started.current || !size.w || !sheet.y) return;
+    started.current = true;
+    fetchLatestIn(regionBounds(START, 3))
+      .then((p) => {
+        if (!p) return;
+        flyTo(p.lat, p.lng);
+        goTo(new Date(p.taken_at));
+      })
       .catch(() => setOffline(true));
-  }, [goTo]);
+  }, [size.w, sheet.y, flyTo, goTo]);
 
   // Возврат на карту: обновить лайки и выполнить «перелёт», если его попросили
   useFocusEffect(
     useCallback(() => {
       const f = consumeMapFocus();
       if (f) {
-        mapRef.current?.animateToRegion({ latitude: f.lat, longitude: f.lng, latitudeDelta: 0.004, longitudeDelta: 0.004 }, 700);
+        flyTo(f.lat, f.lng, 0.004);
         if (f.at) goTo(f.at);
       }
       if (firstFocus.current) firstFocus.current = false;
       else setReload((k) => k + 1);
-    }, [goTo]),
+    }, [goTo, flyTo]),
   );
 
   // Все фото выбранного дня в области (с запасом) — проявление по времени считается на телефоне
@@ -189,12 +214,17 @@ export default function MapScreen() {
     const perm = await Location.requestForegroundPermissionsAsync();
     if (!perm.granted) return Alert.alert('Нет доступа к геопозиции', 'Разрешите его в настройках телефона.');
     const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    mapRef.current?.animateToRegion({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, latitudeDelta: 0.008, longitudeDelta: 0.008 }, 700);
+    flyTo(pos.coords.latitude, pos.coords.longitude, 0.008);
   };
 
   const toLatest = async () => {
-    const p = await fetchLatestIn(regionBounds(region, 1.3)).catch(() => null);
-    if (p) goTo(new Date(p.taken_at));
+    // ищем всё шире: рядом, затем по городу
+    let p = await fetchLatestIn(regionBounds(region, 1.5)).catch(() => null);
+    if (!p) p = await fetchLatestIn(regionBounds(region, 30)).catch(() => null);
+    if (p) {
+      flyTo(p.lat, p.lng);
+      goTo(new Date(p.taken_at));
+    }
     else Alert.alert('Здесь пока нет фото', 'Станьте первым — нажмите «+» внизу.');
   };
 
@@ -245,14 +275,14 @@ export default function MapScreen() {
       )}
 
       {loaded && dayTotal === 0 && !offline && (
-        <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut} style={[styles.empty, { top: insets.top + 70 }]}>
+        <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut} style={[styles.empty, { bottom: sheetBottom + sheet.h + 12 }]}>
           <Text style={styles.emptyTitle}>В этот день здесь пусто</Text>
           <PillButton title="К последним фото" small onPress={toLatest} icon="arrow" />
         </Animated.View>
       )}
 
       {/* Карточка шкалы времени */}
-      <View style={[styles.sheet, { bottom: sheetBottom }]}>
+      <View style={[styles.sheet, { bottom: sheetBottom }]} onLayout={(e) => setSheet({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
         <TimeScrubber
           counts={counts}
           initialIndex={index}
@@ -316,7 +346,8 @@ const styles = StyleSheet.create({
   banner: { position: 'absolute', alignSelf: 'center', backgroundColor: D.ink, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, zIndex: 1000, elevation: 30 },
   bannerText: { fontFamily: F.sansMedium, fontSize: 13, color: D.paper },
   empty: {
-    position: 'absolute', alignSelf: 'center', alignItems: 'center', gap: 10, backgroundColor: D.white, padding: 16, borderRadius: 20, ...softShadow, zIndex: 1000,
+    position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: D.white,
+    paddingLeft: 18, paddingRight: 8, paddingVertical: 8, borderRadius: 999, ...softShadow, zIndex: 1000, elevation: 30,
   },
   emptyTitle: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink },
   sheet: {

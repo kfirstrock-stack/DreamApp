@@ -6,7 +6,6 @@ import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View, use
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
-  FadeInDown,
   FadeOut,
   SlideInDown,
   SlideOutDown,
@@ -24,7 +23,7 @@ import { RoundButton } from '@/components/ui/RoundButton';
 import { useAuth } from '@/lib/auth';
 import { D, F, STEP_MIN } from '@/lib/design';
 import {
-  boundsAround, cachedPhoto, deletePhoto, fetchPhotoFull, fetchPhotosV2, hideAuthor, photoUrl, reportPhoto, setLike, type ReportReason,
+  boundsAround, cachedPhoto, deletePhoto, fetchPhotoFull, fetchPhotosV2, hideAuthor, photoSource, reportPhoto, setLike, type ReportReason,
 } from '@/lib/photos';
 import type { Photo } from '@/lib/types';
 
@@ -61,6 +60,7 @@ export default function PhotoScreen() {
   const [attempt, setAttempt] = useState(0);
   const [others, setOthers] = useState<Photo[]>([]);
   const [menu, setMenu] = useState<null | 'actions' | 'report'>(null);
+  const [img, setImg] = useState<'loading' | 'ok' | 'error'>('loading');
 
   useEffect(() => {
     setFailed(null);
@@ -168,7 +168,22 @@ export default function PhotoScreen() {
     <View style={styles.root}>
       <GestureDetector gesture={doubleTap}>
         <View style={{ height: imageH }} collapsable={false}>
-          <Image source={{ uri: photoUrl(photo.storage_path) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
+          {/* Снимок проявляется плавно; пока грузится — мягкий индикатор, при ошибке — понятное сообщение */}
+          <Image
+            source={photoSource(photo.storage_path)}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={{ duration: 450, effect: 'cross-dissolve' }}
+            onLoad={() => setImg('ok')}
+            onError={() => setImg('error')}
+          />
+          {img === 'loading' && <ActivityIndicator style={styles.imgState} color={D.paper} />}
+          {img === 'error' && (
+            <View style={styles.imgState}>
+              <Icon name="eyeOff" size={28} color={D.paper} />
+              <Text style={styles.imgErr}>Снимок не загрузился</Text>
+            </View>
+          )}
           <View style={[styles.shadeTop]} />
           <Animated.View pointerEvents="none" style={[styles.burst, burstStyle]}>
             <Icon name="heartFill" size={96} color={D.sun} />
@@ -187,7 +202,7 @@ export default function PhotoScreen() {
         </View>
       </View>
 
-      <Animated.View entering={FadeInDown.springify().damping(18)} style={[styles.sheet, { paddingBottom: insets.bottom + 16, top: imageH - 28 }]}>
+      <Animated.View entering={SlideInDown.springify().damping(16).stiffness(140).mass(0.9)} style={[styles.sheet, { paddingBottom: insets.bottom + 16, top: imageH - 28 }]}>
         <View style={styles.authorRow}>
           {photo.author_avatar ? <Image source={{ uri: photo.author_avatar }} style={styles.avatar} /> : <View style={[styles.avatar, { backgroundColor: D.sun }]} />}
           <View style={{ flex: 1 }}>
@@ -213,7 +228,7 @@ export default function PhotoScreen() {
         {photo.caption ? <Text style={styles.caption}>{photo.caption}</Text> : null}
 
         {others.length > 0 && (
-          <Animated.View entering={FadeIn.delay(150)}>
+          <View>
             <Pressable onPress={openWhoElse} style={styles.who}>
               <View style={styles.avas}>
                 {authors.map((o, k) =>
@@ -232,7 +247,7 @@ export default function PhotoScreen() {
                 <Icon name="arrow" size={16} color={D.white} />
               </View>
             </Pressable>
-          </Animated.View>
+          </View>
         )}
       </Animated.View>
 
@@ -303,6 +318,8 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
   shadeTop: { position: 'absolute', left: 0, right: 0, top: 0, height: 130, backgroundColor: 'rgba(15,14,12,0.35)' },
   burst: { position: 'absolute', alignSelf: 'center', top: '40%' },
+  imgState: { position: 'absolute', alignSelf: 'center', top: '42%', alignItems: 'center', gap: 8 },
+  imgErr: { fontFamily: F.sans, fontSize: 14, color: D.paper, opacity: 0.7 },
   stamp: { position: 'absolute', left: 16, bottom: 44, backgroundColor: 'rgba(15,14,12,0.55)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   stampText: { fontFamily: F.mono, fontSize: 11, color: D.paper, letterSpacing: 0.6 },
   topRow: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between' },
