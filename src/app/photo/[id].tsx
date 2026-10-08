@@ -20,6 +20,7 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
+import { MomentStrip, stripRange } from '@/components/photo/MomentStrip';
 import { PillButton } from '@/components/ui/PillButton';
 import { RoundButton } from '@/components/ui/RoundButton';
 import { useAuth } from '@/lib/auth';
@@ -42,6 +43,9 @@ const ago = (d: Date) => {
   return `${Math.floor(days / 30)} мес. назад`;
 };
 
+// Панель автора помним открытой/свёрнутой между снимками
+let sheetOpenPref = true;
+
 const REASONS: { key: ReportReason; label: string }[] = [
   { key: 'face_without_consent', label: 'На фото я, без моего согласия' },
   { key: 'inappropriate', label: 'Неприемлемое содержание' },
@@ -60,7 +64,7 @@ export default function PhotoScreen() {
   const [photo, setPhoto] = useState<Photo | null>(cachedPhoto(id) ?? null);
   const [failed, setFailed] = useState<null | 'gone' | 'error'>(null);
   const [attempt, setAttempt] = useState(0);
-  const [others, setOthers] = useState<Photo[]>([]);
+  const [nearby, setNearby] = useState<Photo[]>([]); // снимки этого места вокруг момента (для шкалы и «кто ещё»)
   const [menu, setMenu] = useState<null | 'actions' | 'report'>(null);
   const [img, setImg] = useState<'loading' | 'ok' | 'error'>('loading');
 
@@ -71,12 +75,15 @@ export default function PhotoScreen() {
       .catch(() => setFailed((f) => (cachedPhoto(id) ? null : 'error'))); // есть копия из ленты — показываем её
   }, [id, uid, attempt]);
 
-  // Кто ещё снимал это место ±15 минут
+  // Кто ещё снимал это место вокруг момента
   useEffect(() => {
     if (!photo) return;
-    const t = new Date(photo.taken_at).getTime();
-    fetchPhotosV2(boundsAround(photo.lat, photo.lng, 100), new Date(t - 15 * 60000), new Date(t + 15 * 60000), 100)
-      .then((list) => setOthers(list.filter((p) => p.id !== photo.id)))
+    const t = new Date(photo.taken_at);
+    const r = stripRange(t);
+    const from = new Date(Math.min(r.from.getTime(), t.getTime() - 15 * 60000));
+    const to = new Date(Math.max(r.to.getTime(), t.getTime() + 15 * 60000));
+    fetchPhotosV2(boundsAround(photo.lat, photo.lng, 100), from, to, 300)
+      .then(setNearby)
       .catch(() => {});
   }, [photo?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -114,8 +121,52 @@ export default function PhotoScreen() {
   const savedTy = useSharedValue(0);
   const drag = useSharedValue(0);
   const zooming = useSharedValue(0);
-  const sheetH = useSharedValue(0);
-  const imgBottom = useSharedValue(height * 0.3);
+  const imgBottom = useSharedValue(height * 0.22);
+
+  // Панель автора: открыта — вся информация, свёрнута — только автор и место. Тянуть за ручку или тапнуть по ней
+  const [open, setOpen] = useState(sheetOpenPref);
+  const sheetFull = useSharedValue(0); // полная высота панели
+  const sheetPeek = useSharedValue(0); // сколько видно в свёрнутом виде
+  const off = useSharedValue(0); // насколько панель опущена (0 — открыта)
+  const offStart = useSharedValue(0);
+  const openSV = useSharedValue(sheetOpenPref ? 1 : 0);
+  const SHEET_SPRING = { damping: 20, stiffness: 210, mass: 0.8 };
+  const remember = useCallback((o: boolean) => {
+    sheetOpenPref = o;
+    setOpen(o);
+    Haptics.selectionAsync().catch(() => {});
+  }, []);
+  const toggleSheet = useCallback(() => {
+    const o = openSV.value === 0;
+    openSV.value = o ? 1 : 0;
+    off.value = withSpring(o ? 0 : Math.max(0, sheetFull.value - sheetPeek.value), SHEET_SPRING);
+    remember(o);
+  }, [openSV, off, sheetFull, sheetPeek, remember]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sheetPan = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetY([-8, 8])
+        .failOffsetX([-20, 20])
+        .onStart(() => {
+          offStart.value = off.value;
+        })
+        .onUpdate((e) => {
+          const m = Math.max(0, sheetFull.value - sheetPeek.value);
+          let v = offStart.value + e.translationY;
+          if (v < 0) v *= 0.25; // резинка за краями
+          if (v > m) v = m + (v - m) * 0.25;
+          off.value = v;
+        })
+        .onEnd((e) => {
+          const m = Math.max(0, sheetFull.value - sheetPeek.value);
+          const o = e.velocityY < -400 ? true : e.velocityY > 400 ? false : off.value < m / 2;
+          const changed = (openSV.value === 1) !== o;
+          openSV.value = o ? 1 : 0;
+          off.value = withSpring(o ? 0 : m, { ...SHEET_SPRING, velocity: e.velocityY });
+          if (changed) scheduleOnRN(remember, o);
+        }),
+    [], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const chromeAway = useSharedValue(0); // 1 — кнопки уехали наверх (пока щипаем или тянем фото)
 
   const setFullMode = useCallback(
@@ -249,7 +300,22 @@ export default function PhotoScreen() {
   const shadeStyle = useAnimatedStyle(() => ({ opacity: 1 - chromeAway.value }));
   const sheetStyle = useAnimatedStyle(() => ({
     opacity: 1 - Math.min(1, drag.value / 150),
-    transform: [{ translateY: fullP.value * (sheetH.value + 40) }],
+    transform: [{ translateY: off.value + fullP.value * (sheetFull.value + 40) }],
+  }));
+  // насколько панель открыта: 0…1
+  const openness = () => {
+    'worklet';
+    const m = sheetFull.value - sheetPeek.value;
+    return m > 0 ? Math.min(1, Math.max(0, 1 - off.value / m)) : 1;
+  };
+  const bodyStyle = useAnimatedStyle(() => ({ opacity: Math.pow(openness(), 2) }));
+  // ручка: открыто — ровная черта, свёрнуто — стрелка «вверх»
+  const gripL = useAnimatedStyle(() => ({ transform: [{ rotate: `${-18 * (1 - openness())}deg` }] }));
+  const gripR = useAnimatedStyle(() => ({ transform: [{ rotate: `${18 * (1 - openness())}deg` }] }));
+  // дата и нижнее затемнение едут вместе с верхним краем панели
+  const riseStyle = useAnimatedStyle(() => ({
+    opacity: 1 - fullP.value,
+    transform: [{ translateY: -(sheetFull.value - off.value) }],
   }));
 
   if (failed === 'error' && !photo) {
@@ -284,7 +350,11 @@ export default function PhotoScreen() {
 
   const taken = new Date(photo.taken_at);
   const mine = uid === photo.user_id;
-  const authors = Array.from(new Map(others.map((o) => [o.user_id, o])).values()).slice(0, 4);
+  const t0 = taken.getTime();
+  const others = nearby.filter((o) => o.id !== photo.id && Math.abs(new Date(o.taken_at).getTime() - t0) <= 15 * 60000);
+  const people = Array.from(new Map(others.filter((o) => o.user_id !== photo.user_id).map((o) => [o.user_id, o])).values());
+  const authors = people.slice(0, 4);
+  const times = nearby.map((o) => new Date(o.taken_at).getTime());
   const windowStart = new Date(taken);
   windowStart.setMinutes(Math.floor(taken.getMinutes() / STEP_MIN) * STEP_MIN, 0, 0);
 
@@ -331,11 +401,15 @@ export default function PhotoScreen() {
               </View>
             )}
             {/* Затемнения как в макете: сверху — под кнопки, снизу — снимок перетекает в панель автора */}
-            <Animated.View pointerEvents="none" style={[styles.shadeTop, shadeStyle]} />
-            <View pointerEvents="none" style={styles.shadeBottom} />
+            <Animated.View pointerEvents="none" style={[styles.shadeTopWrap, shadeStyle]}>
+              <View style={styles.shadeTop} />
+            </Animated.View>
             <Animated.View pointerEvents="none" style={[styles.burst, burstStyle]}>
               <Icon name="heartFill" size={96} color={D.sun} />
             </Animated.View>
+          </Animated.View>
+          <Animated.View pointerEvents="none" style={[styles.rise, riseStyle]}>
+            <View style={styles.shadeBottom} />
             <View style={styles.stamp}>
               <Text style={styles.stampText}>{stamp(taken)}</Text>
             </View>
@@ -355,62 +429,86 @@ export default function PhotoScreen() {
         </View>
       </Animated.View>
 
-      <Animated.View
-        entering={SlideInDown.springify().damping(16).stiffness(140).mass(0.9)}
-        style={styles.sheetWrap}
-        pointerEvents={full ? 'none' : 'box-none'}
-        onLayout={(e) => {
-          const h = e.nativeEvent.layout.height;
-          const first = sheetH.value === 0;
-          sheetH.value = h;
-          imgBottom.value = first ? h - 28 : withTiming(h - 28, { duration: 250 });
-        }}
-      >
-        <Animated.View style={[styles.sheet, { paddingBottom: insets.bottom + 12 }, sheetStyle]}>
-          <View style={styles.authorRow}>
-            {photo.author_avatar ? <Image source={{ uri: photo.author_avatar }} style={styles.avatar} /> : <View style={[styles.avatar, { backgroundColor: D.sun }]} />}
-            <View style={{ flex: 1 }}>
-              <Text style={styles.author}>{photo.author_name || photo.author_username || 'Путешественник'}</Text>
-              <Text style={styles.sub} numberOfLines={1}>
-                снял в {pad(taken.getHours())}:{pad(taken.getMinutes())} · {ago(taken)}
-              </Text>
-            </View>
-            <Pressable onPress={() => toggleLike()} hitSlop={10} style={styles.like} accessibilityLabel={photo.liked_by_me ? 'Убрать лайк' : 'Лайк'}>
-              <Animated.View style={heartStyle}>
-                <Icon name={photo.liked_by_me ? 'heartFill' : 'heart'} size={22} color={photo.liked_by_me ? D.sun : D.paper} />
-              </Animated.View>
-              <Text style={styles.likeCount}>{photo.like_count ?? 0}</Text>
-            </Pressable>
-          </View>
-
-          {photo.place_name ? (
-            <View style={styles.placeRow}>
-              <Icon name="pin" size={15} color={D.sun} />
-              <Text style={styles.place} numberOfLines={1}>{photo.place_name}</Text>
-            </View>
-          ) : null}
-          {photo.caption ? <Text style={styles.caption}>{photo.caption}</Text> : null}
-
-          {others.length > 0 && (
-            <Animated.View entering={FadeIn.duration(250)}>
-              <Pressable onPress={openWhoElse} style={styles.who}>
-                <View style={styles.avas}>
-                  {authors.map((o, k) =>
-                    o.author_avatar ? (
-                      <Image key={o.user_id} source={{ uri: o.author_avatar }} style={[styles.whoAva, { marginLeft: k ? -8 : 0, zIndex: 10 - k }]} />
-                    ) : (
-                      <View key={o.user_id} style={[styles.whoAva, { marginLeft: k ? -8 : 0, backgroundColor: D.sun }]} />
-                    ),
-                  )}
-                </View>
-                <Text style={styles.whoTitle} numberOfLines={1}>
-                  Ещё {others.length} {plural(others.length, 'снимок', 'снимка', 'снимков')} здесь <Text style={styles.whoSub}>±15 мин</Text>
-                </Text>
-                <Icon name="chevR" size={14} color={D.paper} />
+      <Animated.View entering={SlideInDown.springify().damping(16).stiffness(140).mass(0.9)} style={styles.sheetWrap} pointerEvents={full ? 'none' : 'box-none'}>
+        <GestureDetector gesture={sheetPan}>
+          <Animated.View
+            style={[styles.sheet, { paddingBottom: insets.bottom + 12 }, sheetStyle]}
+            onLayout={(e) => {
+              const h = e.nativeEvent.layout.height;
+              const first = sheetFull.value === 0;
+              sheetFull.value = h;
+              if (openSV.value === 0) off.value = first ? Math.max(0, h - sheetPeek.value) : withTiming(Math.max(0, h - sheetPeek.value));
+            }}
+          >
+            {/* Шапка: видна всегда */}
+            <View
+              onLayout={(e) => {
+                const peek = e.nativeEvent.layout.y + e.nativeEvent.layout.height + insets.bottom + 12;
+                sheetPeek.value = peek;
+                imgBottom.value = peek - 28;
+                if (openSV.value === 0 && sheetFull.value) off.value = Math.max(0, sheetFull.value - peek);
+              }}
+            >
+              <Pressable onPress={toggleSheet} style={styles.grip} hitSlop={{ top: 10, bottom: 6 }} accessibilityRole="button" accessibilityLabel={open ? 'Свернуть подробности' : 'Показать подробности'}>
+                <Animated.View style={[styles.gripHalf, { marginRight: -1.5 }, gripL]} />
+                <Animated.View style={[styles.gripHalf, { marginLeft: -1.5 }, gripR]} />
               </Pressable>
+              <View style={styles.authorRow}>
+                {photo.author_avatar ? <Image source={{ uri: photo.author_avatar }} style={styles.avatar} /> : <View style={[styles.avatar, { backgroundColor: D.sun }]} />}
+                <View style={{ flex: 1, gap: 3 }}>
+                  <Text style={styles.author} numberOfLines={1}>{photo.author_name || photo.author_username || 'Путешественник'}</Text>
+                  <Text style={styles.sub} numberOfLines={1}>
+                    снял в {pad(taken.getHours())}:{pad(taken.getMinutes())} · {ago(taken)}
+                  </Text>
+                </View>
+                <Pressable onPress={() => toggleLike()} hitSlop={10} style={styles.like} accessibilityLabel={photo.liked_by_me ? 'Убрать лайк' : 'Лайк'}>
+                  <Animated.View style={heartStyle}>
+                    <Icon name={photo.liked_by_me ? 'heartFill' : 'heart'} size={20} color={photo.liked_by_me ? D.sun : D.paper} />
+                  </Animated.View>
+                  <Text style={styles.likeCount}>{photo.like_count ?? 0}</Text>
+                </Pressable>
+              </View>
+              {photo.place_name ? (
+                <View style={styles.placeRow}>
+                  <Icon name="pin" size={16} color={D.sun} />
+                  <Text style={styles.place} numberOfLines={1}>{photo.place_name}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Подробности: прячутся под ручку */}
+            <Animated.View style={bodyStyle} pointerEvents={open ? 'auto' : 'none'}>
+              {photo.caption ? <Text style={styles.caption}>{photo.caption}</Text> : null}
+              {people.length > 0 && (
+                <Animated.View entering={FadeIn.duration(250)}>
+                  <Pressable onPress={openWhoElse} style={({ pressed }) => [styles.who, pressed && { opacity: 0.85 }]}>
+                    <View style={styles.avas}>
+                      {authors.map((o, k) =>
+                        o.author_avatar ? (
+                          <Image key={o.user_id} source={{ uri: o.author_avatar }} style={[styles.whoAva, { marginLeft: k ? -8 : 0, zIndex: 10 - k }]} />
+                        ) : (
+                          <View key={o.user_id} style={[styles.whoAva, { marginLeft: k ? -8 : 0, zIndex: 10 - k, backgroundColor: D.sun }]} />
+                        ),
+                      )}
+                    </View>
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <Text style={styles.whoTitle} numberOfLines={1}>
+                        Ещё {people.length} {plural(people.length, 'человек', 'человека', 'человек')}
+                      </Text>
+                      <Text style={styles.whoSub}>были здесь ±15 минут</Text>
+                    </View>
+                    <View style={styles.go}>
+                      <Icon name="arrow" size={18} color={D.white} />
+                    </View>
+                  </Pressable>
+                </Animated.View>
+              )}
+              <View style={styles.strip}>
+                <MomentStrip taken={taken} times={times} onPress={openWhoElse} />
+              </View>
             </Animated.View>
-          )}
-        </Animated.View>
+          </Animated.View>
+        </GestureDetector>
       </Animated.View>
 
       {/* Меню ⋯ — B7 */}
@@ -482,36 +580,42 @@ const styles = StyleSheet.create({
   viewer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   cover: { position: 'absolute', top: 0, left: 0, right: 0 },
   sheetWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  shadeTopWrap: { position: 'absolute', left: 0, right: 0, top: 0, height: 140 },
   shadeTop: {
     position: 'absolute', left: 0, right: 0, top: 0, height: 140,
     experimental_backgroundImage: 'linear-gradient(180deg, rgba(15,14,12,0.7) 0%, rgba(15,14,12,0) 100%)',
   },
   // 160 px градиента до края панели + 28 px, которые уходят под её скругление
+  rise: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 0 },
   shadeBottom: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, height: 188,
+    position: 'absolute', left: 0, right: 0, bottom: -28, height: 188,
     experimental_backgroundImage: 'linear-gradient(180deg, rgba(15,14,12,0) 0%, rgba(15,14,12,0.9) 85%, rgba(15,14,12,0.9) 100%)',
   },
   burst: { position: 'absolute', alignSelf: 'center', top: '40%' },
   imgState: { position: 'absolute', alignSelf: 'center', top: '42%', alignItems: 'center', gap: 8 },
   imgErr: { fontFamily: F.sans, fontSize: 14, color: D.paper, opacity: 0.7 },
-  stamp: { position: 'absolute', left: 16, bottom: 44, backgroundColor: 'rgba(15,14,12,0.55)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  stamp: { position: 'absolute', left: 16, bottom: 6, backgroundColor: 'rgba(15,14,12,0.55)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   stampText: { fontFamily: F.mono, fontSize: 11, color: D.paper, letterSpacing: 0.6 },
   topRow: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', zIndex: 10 },
-  sheet: { backgroundColor: D.night2, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 18, gap: 10 },
+  sheet: { backgroundColor: D.night2, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20 },
+  grip: { height: 28, flexDirection: 'row', justifyContent: 'center', paddingTop: 10 },
+  gripHalf: { width: 19.5, height: 4, borderRadius: 2, backgroundColor: 'rgba(244,239,230,0.2)' },
+  strip: { marginTop: 18 },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: { width: 44, height: 44, borderRadius: 22 },
   author: { fontFamily: F.sansSemi, fontSize: 16, color: D.paper },
-  sub: { fontFamily: F.sans, fontSize: 13, color: D.paper, opacity: 0.55, marginTop: 2 },
+  sub: { fontFamily: F.sans, fontSize: 13, color: 'rgba(244,239,230,0.55)' },
   like: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 4 },
   likeCount: { fontFamily: F.sansMedium, fontSize: 14, color: D.paper },
-  placeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  place: { fontFamily: F.sans, fontSize: 14, color: D.paper, opacity: 0.85 },
-  caption: { fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: D.paper },
-  who: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: D.night3, borderRadius: 16, paddingVertical: 9, paddingHorizontal: 12, marginTop: 2 },
+  placeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16 },
+  place: { flex: 1, fontFamily: F.sans, fontSize: 14, color: 'rgba(244,239,230,0.85)' },
+  caption: { fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: D.paper, marginTop: 10 },
+  who: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: D.night3, borderRadius: 20, height: 74, paddingHorizontal: 14, marginTop: 16 },
   avas: { flexDirection: 'row' },
-  whoAva: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: D.night3 },
-  whoTitle: { flex: 1, fontFamily: F.sansMedium, fontSize: 14, color: D.paper },
+  whoAva: { width: 34, height: 34, borderRadius: 17, borderWidth: 2, borderColor: D.night3, margin: -2 },
+  whoTitle: { fontFamily: F.sansSemi, fontSize: 15, color: D.paper },
   whoSub: { fontFamily: F.sans, fontSize: 13, color: 'rgba(244,239,230,0.55)' },
+  go: { width: 36, height: 36, borderRadius: 18, backgroundColor: D.sun, alignItems: 'center', justifyContent: 'center' },
   goneIcon: { width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(244,239,230,0.08)', alignItems: 'center', justifyContent: 'center' },
   goneTitle: { fontFamily: F.serif, fontSize: 28, color: D.paper, marginTop: 24, textAlign: 'center' },
   goneText: { fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: D.paper, opacity: 0.6, marginTop: 10, textAlign: 'center' },
