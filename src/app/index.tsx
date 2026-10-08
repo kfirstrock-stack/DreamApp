@@ -529,7 +529,7 @@ export default function MapScreen() {
               </View>
               <View style={styles.timeRow}>
                 {clockStep ? (
-                  <RollingTime key={step} index={indexSV} step={step === 'hour' ? 60 : STEP_MIN} size={50} />
+                  <RollingTime key={step} index={indexSV} initial={index} step={step === 'hour' ? 60 : STEP_MIN} size={50} />
                 ) : (
                   <Animated.Text key={`${step}${start.getTime()}${index}`} entering={FadeIn.duration(220)} style={styles.bigLabel}>
                     {bigLabel(step, start, index)}

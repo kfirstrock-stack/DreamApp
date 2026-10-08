@@ -43,10 +43,10 @@ function Cell({ j, pos, h, size, color }: { j: number; pos: SharedValue<number>;
   );
 }
 
-function RollingDigit({ index, step, place, size, color }: { index: SharedValue<number>; step: number; place: number; size: number; color: string }) {
+function RollingDigit({ index, initial, step, place, size, color }: { index: SharedValue<number>; initial: number; step: number; place: number; size: number; color: string }) {
   const h = Math.round(size * 1.18);
   const reduce = useReducedMotion();
-  const start = digitAt(index.value, step, place);
+  const start = digitAt(initial, step, place); // начальное значение — из React, не из анимационного потока
   const target = useSharedValue(start); // накапливаемая позиция барабана (без обрезки до 0–9)
   const pos = useSharedValue(start);
 
@@ -86,14 +86,14 @@ function RollingDigit({ index, step, place, size, color }: { index: SharedValue<
 }
 
 /** «14:05» для текущего интервала; каждая цифра — отдельный барабан */
-export function RollingTime({ index, step = 15, size = 56, color = D.ink }: { index: SharedValue<number>; step?: number; size?: number; color?: string }) {
+export function RollingTime({ index, initial, step = 15, size = 56, color = D.ink }: { index: SharedValue<number>; initial: number; step?: number; size?: number; color?: string }) {
   return (
     <View style={styles.row}>
-      <RollingDigit index={index} step={step} place={0} size={size} color={color} />
-      <RollingDigit index={index} step={step} place={1} size={size} color={color} />
+      <RollingDigit index={index} initial={initial} step={step} place={0} size={size} color={color} />
+      <RollingDigit index={index} initial={initial} step={step} place={1} size={size} color={color} />
       <Text style={[styles.colon, { fontSize: size, lineHeight: Math.round(size * 1.18), color }]}>:</Text>
-      <RollingDigit index={index} step={step} place={2} size={size} color={color} />
-      <RollingDigit index={index} step={step} place={3} size={size} color={color} />
+      <RollingDigit index={index} initial={initial} step={step} place={2} size={size} color={color} />
+      <RollingDigit index={index} initial={initial} step={step} place={3} size={size} color={color} />
     </View>
   );
 }

@@ -1,7 +1,9 @@
 import { SymbolView } from 'expo-symbols';
 import type { ColorValue } from 'react-native';
+import Svg, { G, Path } from 'react-native-svg';
+import { FIGMA_ICONS, ICON_ALIAS } from './figmaIcons';
 
-// Единый набор иконок: SF Symbols на iPhone, Material Symbols на Android
+// Иконки из макета (Figma, слои icon/*) — линейные, 24×24. Для тех, что в макете не нарисованы, — SF Symbols / Material.
 const ICONS = {
   camera: { ios: 'camera.fill', android: 'photo_camera' },
   gallery: { ios: 'photo.on.rectangle', android: 'photo_library' },
@@ -41,5 +43,18 @@ const ICONS = {
 export type IconName = keyof typeof ICONS;
 
 export function Icon({ name, size = 22, color = '#16130F' }: { name: IconName; size?: number; color?: ColorValue }) {
+  const parts = FIGMA_ICONS[ICON_ALIAS[name] ?? ''];
+  if (parts) {
+    const filled = name === 'heartFill' || name === 'more';
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24">
+        {parts.map(([x, y, sw, d], i) => (
+          <G key={i} transform={`translate(${x} ${y})`}>
+            <Path d={d} fill={filled ? (color as string) : 'none'} stroke={color as string} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
+          </G>
+        ))}
+      </Svg>
+    );
+  }
   return <SymbolView name={ICONS[name]} size={size} tintColor={color} />;
 }
