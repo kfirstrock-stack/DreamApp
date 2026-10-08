@@ -199,15 +199,18 @@ export default function MapScreen() {
     Haptics.selectionAsync().catch(() => {});
   };
   const miniGesture = Gesture.Race(
+    // горизонталь: срабатывает рано и прощает «дугу» большого пальца (диагональ до ~45°)
     Gesture.Pan()
-      .activeOffsetX([-14, 14])
-      .failOffsetY([-14, 14])
+      .activeOffsetX([-10, 10])
+      .failOffsetY([-36, 36])
       .onEnd((e) => {
-        if (e.translationX < -30 || e.velocityX < -500) scheduleOnRN(stepBy, 1);
-        else if (e.translationX > 30 || e.velocityX > 500) scheduleOnRN(stepBy, -1);
+        if (e.translationX < -24 || e.velocityX < -400) scheduleOnRN(stepBy, 1);
+        else if (e.translationX > 24 || e.velocityX > 400) scheduleOnRN(stepBy, -1);
       }),
+    // вертикаль: только вверх и только почти прямо — не перехватывает горизонтальные свайпы
     Gesture.Pan()
-      .activeOffsetY([-14, 14])
+      .activeOffsetY(-18)
+      .failOffsetX([-16, 16])
       .onEnd((e) => {
         if (e.translationY < -20) scheduleOnRN(setMode, 'compact');
       }),
