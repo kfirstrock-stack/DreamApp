@@ -15,6 +15,7 @@ const ICONS = {
   back: { ios: 'chevron.left', android: 'arrow_back_ios_new' },
   chevL: { ios: 'chevron.left', android: 'chevron_left' },
   chevR: { ios: 'chevron.right', android: 'chevron_right' },
+  chevD: { ios: 'chevron.down', android: 'expand_more' },
   close: { ios: 'xmark', android: 'close' },
   menu: { ios: 'line.3.horizontal', android: 'menu' },
   trash: { ios: 'trash', android: 'delete' },

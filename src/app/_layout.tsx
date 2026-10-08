@@ -30,10 +30,10 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: D.paper } }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: D.paper }, orientation: 'portrait_up' }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="moment" />
-          <Stack.Screen name="photo/[id]" options={{ animation: 'fade', contentStyle: { backgroundColor: D.night } }} />
+          <Stack.Screen name="photo/[id]" options={{ animation: 'fade', contentStyle: { backgroundColor: D.night }, orientation: 'all' }} />
           <Stack.Screen name="profile" />
           <Stack.Screen name="add" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="sign-in" options={{ presentation: 'fullScreenModal' }} />

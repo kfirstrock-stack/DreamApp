@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import MapView from 'react-native-maps';
-import Animated, { FadeIn, FadeOut, useSharedValue } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { HALO, MomentLayer, PIN, type Pin } from '@/components/map/MomentLayer';
@@ -15,11 +15,34 @@ import { PillButton } from '@/components/ui/PillButton';
 import { RoundButton } from '@/components/ui/RoundButton';
 import { TAB_BAR_SPACE, TabBar } from '@/components/ui/TabBar';
 import { useAuth } from '@/lib/auth';
-import { BUCKETS, D, F, STEP_MIN, softShadow } from '@/lib/design';
+import { D, F, STEP_MIN, softShadow } from '@/lib/design';
 import { consumeMapFocus } from '@/lib/focus';
 import { project, regionBounds, regionRadiusM, type MapRegion } from '@/lib/geo';
 import { fetchLatestIn, fetchPhotosV2 } from '@/lib/photos';
+import {
+  STEPS, bigLabel, bucketCount, bucketIndex, bucketStart, clock, emptyRangeTitle, isCurrentRange, momentSuffix, position,
+  rangeEnd, rangeLabel, rangeStart, shiftRange, ticks, untilLabel, type Step,
+} from '@/lib/timeSteps';
 import type { Photo } from '@/lib/types';
+
+// Выбор шага шкалы и вида карты помним, пока приложение открыто
+let stepPref: Step = '15m';
+type MapStyle = 'warm' | 'satellite' | 'night';
+let mapStylePref: MapStyle = 'warm';
+const MAP_STYLES: { key: MapStyle; label: string; color: string }[] = [
+  { key: 'warm', label: 'Тёплая', color: '#ECE5D8' },
+  { key: 'satellite', label: 'Спутник', color: '#51614D' },
+  { key: 'night', label: 'Ночная', color: '#1F2129' },
+];
+// Ночная карта для Android (на iPhone — системная тёмная тема карты)
+const NIGHT_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#1f2129' }] },
+  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8a8f99' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#1f2129' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2c2f38' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#151a22' }] },
+];
 
 // Старт — Исаакиевская площадь (там демо-снимки)
 const START: MapRegion = { latitude: 59.9341, longitude: 30.3061, latitudeDelta: 0.009, longitudeDelta: 0.009 };
@@ -36,23 +59,6 @@ const WARM_STYLE = [
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c7d5d2' }] },
 ];
 
-const startOfDay = (d: Date) => {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-};
-const addDays = (d: Date, n: number) => {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
-};
-const bucketOf = (d: Date, day: Date) =>
-  Math.min(BUCKETS - 1, Math.max(0, Math.floor((d.getTime() - day.getTime()) / 60000 / STEP_MIN)));
-const pad = (n: number) => String(n).padStart(2, '0');
-const hhmm = (m: number) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
-const WD = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
-const MON = ['ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ', 'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ'];
-const dayLabel = (d: Date) => `${WD[d.getDay()]}, ${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`;
 const plural = (n: number, one: string, few: string, many: string) => {
   const m10 = n % 10, m100 = n % 100;
   if (m10 === 1 && m100 !== 11) return one;
@@ -70,9 +76,12 @@ export default function MapScreen() {
   const regionSV = useSharedValue<MapRegion>(START);
   const [region, setRegion] = useState<MapRegion>(START);
 
-  const today = startOfDay(new Date());
-  const [day, setDay] = useState(today);
-  const [index, setIndex] = useState(() => bucketOf(new Date(), today));
+  const [step, setStep] = useState<Step>(stepPref);
+  const [start, setStart] = useState(() => rangeStart(stepPref, new Date()));
+  const [index, setIndex] = useState(() => bucketIndex(stepPref, rangeStart(stepPref, new Date()), new Date()));
+  const [stepMenu, setStepMenu] = useState(false);
+  const [mapStyle, setMapStyle] = useState<MapStyle>(mapStylePref);
+  const [layers, setLayers] = useState(false);
   const indexSV = useSharedValue(index);
   const now = useSharedValue(index * STEP_MIN + STEP_MIN / 2);
   const [jump, setJump] = useState<{ i: number; key: number } | null>(null);
@@ -102,11 +111,32 @@ export default function MapScreen() {
   );
 
   // Перейти к моменту: день + интервал на шкале (шкала доедет сама)
-  const goTo = useCallback((at: Date) => {
-    const d = startOfDay(at);
-    setDay(d);
-    setJump({ i: bucketOf(at, d), key: Date.now() });
-  }, []);
+  const goTo = useCallback(
+    (at: Date) => {
+      const st = rangeStart(step, at);
+      setStart(st);
+      setJump({ i: bucketIndex(step, st, at), key: Date.now() });
+    },
+    [step],
+  );
+  // Смена шага: выбранный момент остаётся выбранным, шкала перестраивается
+  const changeStep = (next: Step) => {
+    setStepMenu(false);
+    if (next === step) return;
+    const moment = new Date(bucketStart(step, start, index).getTime() + 60000);
+    const st = rangeStart(next, moment);
+    const i = bucketIndex(next, st, moment);
+    stepPref = next;
+    setStep(next);
+    setStart(st);
+    setIndex(i);
+    indexSV.value = i;
+    now.value = i * STEP_MIN + STEP_MIN / 2;
+  };
+  const chooseMapStyle = (m: MapStyle) => {
+    mapStylePref = m;
+    setMapStyle(m);
+  };
 
   // При старте — к последнему моменту, где здесь есть фото: и карта, и шкала
   const started = useRef(false);
@@ -140,7 +170,8 @@ export default function MapScreen() {
     let cancelled = false;
     const t = setTimeout(async () => {
       try {
-        const list = await fetchPhotosV2(regionBounds(region, 1.6), day, addDays(day, 1), 800);
+        const limit = step === 'week' ? 3000 : step === 'day' ? 2000 : 800;
+        const list = await fetchPhotosV2(regionBounds(region, 1.6), start, rangeEnd(step, start), limit);
         if (cancelled) return;
         setPhotos(list);
         setOffline(false);
@@ -154,26 +185,26 @@ export default function MapScreen() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [region, day, reload]);
+  }, [region, start, step, reload]);
 
   const counts = useMemo(() => {
-    const c = new Array(BUCKETS).fill(0);
-    const ms = day.getTime();
+    const n = bucketCount(step, start);
+    const c = new Array(n).fill(0);
     for (const p of photos) {
-      const b = Math.floor((new Date(p.taken_at).getTime() - ms) / 60000 / STEP_MIN);
-      if (b >= 0 && b < BUCKETS) c[b]++;
+      const b = Math.floor(position(step, start, new Date(p.taken_at)));
+      if (b >= 0 && b < n) c[b]++;
     }
     return c;
-  }, [photos, day]);
+  }, [photos, step, start]);
 
   // Фото рядом по времени (±2,5 часа) + стопки среди снимков текущего интервала
   const { pins, groups } = useMemo(() => {
     const groups = new Map<string, Photo[]>();
     if (!size.w) return { pins: [] as Pin[], groups };
-    const ms = day.getTime();
+    // «минуты» здесь — положение на шкале: столбик × 15 (одна формула проявления для любого шага)
     const centre = index * STEP_MIN + STEP_MIN / 2;
     const near = photos
-      .map((p) => ({ p, minutes: (new Date(p.taken_at).getTime() - ms) / 60000 }))
+      .map((p) => ({ p, minutes: position(step, start, new Date(p.taken_at)) * STEP_MIN }))
       .filter((o) => Math.abs(o.minutes - centre) <= 150);
     const xy = new Map(near.map((o) => [o.p.id, project(o.p.lat, o.p.lng, region, size.w, size.h)]));
     const isActive = (m: number) => Math.floor(m / STEP_MIN) === index;
@@ -243,9 +274,9 @@ export default function MapScreen() {
       };
     });
     return { pins, groups };
-  }, [photos, day, index, region, size, fan]);
+  }, [photos, step, start, index, region, size, fan]);
 
-  const windowFrom = day.getTime() + index * STEP_MIN * 60000;
+  const windowFrom = bucketStart(step, start, index).getTime();
   const openMoment = useCallback(
     (lat: number, lng: number, radius: number, title?: string | null) =>
       router.push({
@@ -287,11 +318,24 @@ export default function MapScreen() {
   };
 
   const inWindow = counts[index] ?? 0;
+  // B2: ближайший интервал с фото — показываем, когда шкала остановилась на пустом
+  const [settled, setSettled] = useState(index);
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(index), 450);
+    return () => clearTimeout(t);
+  }, [index]);
+  const nearest = useMemo(() => {
+    if (inWindow > 0) return null;
+    for (let k = 1; k < counts.length; k++) {
+      for (const j of [index - k, index + k]) if (j >= 0 && j < counts.length && counts[j] > 0) return { i: j, n: counts[j] };
+    }
+    return null;
+  }, [counts, index, inWindow]);
   // B1: кто снимал в этот момент — аватары и счётчик под шкалой
-  const windowPhotos = useMemo(() => {
-    const ms = day.getTime();
-    return photos.filter((p) => Math.floor((new Date(p.taken_at).getTime() - ms) / 60000 / STEP_MIN) === index);
-  }, [photos, day, index]);
+  const windowPhotos = useMemo(
+    () => photos.filter((p) => Math.floor(position(step, start, new Date(p.taken_at))) === index),
+    [photos, step, start, index],
+  );
   const windowAuthors = useMemo(() => Array.from(new Map(windowPhotos.map((p) => [p.user_id, p])).values()), [windowPhotos]);
   // B1: в поиске — название места в центре карты (по ближайшему снимку)
   const placeName = useMemo(() => {
@@ -305,7 +349,8 @@ export default function MapScreen() {
     return best && bd < r * r ? best.place_name : null;
   }, [photos, region]);
   const dayTotal = photos.length;
-  const isToday = day.getTime() === today.getTime();
+  const isToday = isCurrentRange(step, start);
+  const clockStep = step === '15m' || step === 'hour';
   const sheetBottom = Math.max(insets.bottom, 12) + TAB_BAR_SPACE;
 
   return (
@@ -321,8 +366,9 @@ export default function MapScreen() {
           regionSV.value = r;
           setRegion(r);
         }}
-        mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
-        customMapStyle={WARM_STYLE}
+        mapType={mapStyle === 'satellite' ? 'hybrid' : Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
+        customMapStyle={mapStyle === 'night' ? NIGHT_STYLE : WARM_STYLE}
+        userInterfaceStyle={mapStyle === 'night' ? 'dark' : 'light'}
         rotateEnabled={false}
         pitchEnabled={false}
         showsUserLocation
@@ -342,7 +388,7 @@ export default function MapScreen() {
             {placeName ?? 'Найти место'}
           </Text>
         </Pressable>
-        <RoundButton icon="layers" size={46} label="Слои" onPress={() => {}} />
+        <RoundButton icon="layers" size={46} label="Вид карты" onPress={() => setLayers(true)} />
       </View>
 
       {/* «Где я» — справа над шкалой — B1 */}
@@ -359,15 +405,37 @@ export default function MapScreen() {
       )}
 
       {loaded && dayTotal === 0 && !offline && (
-        <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut} style={[styles.empty, { bottom: sheetBottom + sheet.h + 12 }]}>
-          <Text style={styles.emptyTitle}>В этот день здесь пусто</Text>
+        <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut} style={[styles.empty, { bottom: sheetBottom + sheet.h + 74 }]}>
+          <Text style={styles.emptyTitle}>{emptyRangeTitle[step]}</Text>
           <PillButton title="К последним фото" small onPress={toLatest} icon="arrow" />
+        </Animated.View>
+      )}
+
+      {/* B2 · пустой момент: в интервале никого, предлагаем ближайший с фото */}
+      {loaded && !offline && dayTotal > 0 && clockStep && nearest && settled === index && (
+        <Animated.View key={index} entering={FadeIn.duration(250)} exiting={FadeOut.duration(150)} style={[styles.b2, { bottom: sheetBottom + sheet.h + 74 }]}>
+          <View style={styles.b2Head}>
+            <Icon name="clock" size={26} color={D.sun} />
+            <Text style={styles.b2Title}>В {clock(step, start, index)} здесь никого не было</Text>
+          </View>
+          <Text style={styles.b2Text}>
+            Ближайшие фото — в {clock(step, start, nearest.i)}, их {nearest.n}.{bucketStart(step, start, index).getHours() < 6 ? ' Ночью это место пустеет.' : ''}
+          </Text>
+          <Pressable
+            onPress={() => setJump({ i: nearest.i, key: Date.now() })}
+            style={({ pressed }) => [styles.b2Btn, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={styles.b2BtnText}>Перейти к {clock(step, start, nearest.i)}</Text>
+            <Icon name="arrow" size={16} color={D.white} />
+          </Pressable>
         </Animated.View>
       )}
 
       {/* Карточка шкалы времени */}
       <View style={[styles.sheet, { bottom: sheetBottom }]} onLayout={(e) => setSheet({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
         <TimeScrubber
+          key={`${step}:${counts.length}`}
+          ticks={ticks(step, start)}
           counts={counts}
           initialIndex={index}
           now={now}
@@ -387,7 +455,7 @@ export default function MapScreen() {
                   )}
                 </View>
                 <Text style={styles.summaryText} numberOfLines={1}>
-                  {inWindow} фото · {windowAuthors.length} {plural(windowAuthors.length, 'автор', 'автора', 'авторов')} в этот момент
+                  {inWindow} фото · {windowAuthors.length} {plural(windowAuthors.length, 'автор', 'автора', 'авторов')} {momentSuffix[step]}
                 </Text>
               </View>
             ) : null
@@ -395,11 +463,11 @@ export default function MapScreen() {
           header={
             <View style={styles.head}>
               <View style={styles.dayRow}>
-                <Pressable hitSlop={10} onPress={() => setDay((d) => addDays(d, -1))} accessibilityLabel="Предыдущий день">
+                <Pressable hitSlop={10} onPress={() => setStart((st) => shiftRange(step, st, -1))} accessibilityLabel="Назад">
                   <Icon name="chevL" size={16} color={D.ink60} />
                 </Pressable>
-                <Text style={styles.day}>{dayLabel(day)}</Text>
-                <Pressable hitSlop={10} disabled={isToday} onPress={() => setDay((d) => addDays(d, 1))} accessibilityLabel="Следующий день">
+                <Text style={styles.day}>{rangeLabel(step, start)}</Text>
+                <Pressable hitSlop={10} disabled={isToday} onPress={() => setStart((st) => shiftRange(step, st, 1))} accessibilityLabel="Вперёд">
                   <Icon name="chevR" size={16} color={isToday ? D.line : D.ink60} />
                 </Pressable>
                 <View style={{ flex: 1 }} />
@@ -412,12 +480,22 @@ export default function MapScreen() {
                 >
                   <Text style={styles.todayText}>Сейчас</Text>
                 </Pressable>
+                <Pressable onPress={() => setStepMenu((v) => !v)} style={styles.stepChip} hitSlop={6} accessibilityLabel="Шаг шкалы">
+                  <Text style={styles.stepText}>{STEPS.find((x) => x.key === step)!.chip}</Text>
+                  <Icon name="chevD" size={14} color={D.ink} />
+                </Pressable>
               </View>
               <View style={styles.timeRow}>
-                <RollingTime index={indexSV} step={STEP_MIN} size={50} />
+                {clockStep ? (
+                  <RollingTime index={indexSV} step={step === 'hour' ? 60 : STEP_MIN} size={50} />
+                ) : (
+                  <Animated.Text key={`${step}${start.getTime()}${index}`} entering={FadeIn.duration(220)} style={styles.bigLabel}>
+                    {bigLabel(step, start, index)}
+                  </Animated.Text>
+                )}
                 <View style={styles.timeMeta}>
                   <Text style={styles.until}>
-                    –{hhmm((index + 1) * STEP_MIN)}
+                    {untilLabel(step, start, index)}
                     {inWindow === 0 ? ' · 0 фото' : ''}
                   </Text>
                 </View>
@@ -427,6 +505,21 @@ export default function MapScreen() {
         />
       </View>
 
+      {/* M2 · меню шага над шкалой */}
+      {stepMenu && (
+        <>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setStepMenu(false)} accessibilityLabel="Закрыть меню" />
+          <Animated.View entering={FadeInDown.duration(180)} exiting={FadeOut.duration(120)} style={[styles.stepMenu, { bottom: sheetBottom + sheet.h + 10 }]}>
+            {STEPS.map((x) => (
+              <Pressable key={x.key} onPress={() => changeStep(x.key)} style={({ pressed }) => [styles.stepRow, pressed && { backgroundColor: D.paper }]}>
+                <Text style={[styles.stepRowText, x.key === step && styles.stepRowOn]}>{x.menu}</Text>
+                {x.key === step && <Icon name="check" size={16} color={D.sun} />}
+              </Pressable>
+            ))}
+          </Animated.View>
+        </>
+      )}
+
       <TabBar
         active="map"
         onMap={() => {}}
@@ -434,6 +527,29 @@ export default function MapScreen() {
         onAdd={() => router.push(session ? '/add' : '/sign-in')}
         onProfile={() => router.push(session ? '/profile' : '/sign-in')}
       />
+
+      {/* M6 · вид карты */}
+      {layers && (
+        <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.dim}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setLayers(false)} accessibilityLabel="Закрыть" />
+          <Animated.View
+            entering={SlideInDown.springify().damping(18).stiffness(160)}
+            exiting={SlideOutDown.duration(200)}
+            style={[styles.layersSheet, { paddingBottom: Math.max(insets.bottom, 16) + 24 }]}
+          >
+            <View style={styles.grab} />
+            <Text style={styles.layersTitle}>Вид карты</Text>
+            <View style={styles.tiles}>
+              {MAP_STYLES.map((m) => (
+                <Pressable key={m.key} onPress={() => chooseMapStyle(m.key)} style={styles.tile} accessibilityLabel={m.label}>
+                  <View style={[styles.tilePic, { backgroundColor: m.color }, mapStyle === m.key && styles.tileOn]} />
+                  <Text style={[styles.tileText, mapStyle === m.key && styles.tileTextOn]}>{m.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </Animated.View>
+        </Animated.View>
+      )}
 
       {fan && (
         <StackFan
@@ -480,12 +596,41 @@ const styles = StyleSheet.create({
     padding: 16, borderRadius: 20, ...softShadow, zIndex: 1000, elevation: 30,
   },
   emptyTitle: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink },
+  b2: {
+    position: 'absolute', left: 32, right: 32, backgroundColor: D.white, borderRadius: 24, padding: 20, paddingTop: 22, gap: 14, zIndex: 1000, elevation: 30,
+    shadowColor: '#17120D', shadowOpacity: 0.14, shadowRadius: 30, shadowOffset: { width: 0, height: 10 },
+  },
+  b2Head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  b2Title: { flex: 1, fontFamily: F.sansSemi, fontSize: 17, color: D.ink },
+  b2Text: { fontFamily: F.sans, fontSize: 14, lineHeight: 20, color: D.ink60, marginTop: -2 },
+  b2Btn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: D.sun, borderRadius: 999, paddingLeft: 16, paddingRight: 14, paddingVertical: 10 },
+  b2BtnText: { fontFamily: F.sansSemi, fontSize: 14, color: D.white },
   sheet: {
     position: 'absolute', left: 12, right: 12, backgroundColor: D.white, borderRadius: 28, paddingTop: 16, paddingBottom: 6, ...softShadow, zIndex: 1000, elevation: 30,
   },
   head: { paddingHorizontal: 18 },
   dayRow: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 26 },
-  day: { fontFamily: F.mono, fontSize: 11, color: D.ink60, letterSpacing: 1.1, minWidth: 196, textAlign: 'center' },
+  day: { fontFamily: F.mono, fontSize: 11, color: D.ink60, letterSpacing: 0.66, minWidth: 120, textAlign: 'center' },
+  stepChip: { height: 27, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 10, paddingRight: 8, borderRadius: 999, borderWidth: 1, borderColor: D.line },
+  stepText: { fontFamily: F.sansMedium, fontSize: 12, color: D.ink },
+  bigLabel: { fontFamily: F.serif, fontSize: 50, lineHeight: 59, color: D.ink, marginLeft: 4 },
+  stepMenu: {
+    position: 'absolute', right: 30, width: 170, backgroundColor: D.white, borderRadius: 18, paddingVertical: 6, zIndex: 2000, elevation: 40,
+    shadowColor: '#17120D', shadowOpacity: 0.18, shadowRadius: 30, shadowOffset: { width: 0, height: 10 },
+  },
+  stepRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 11 },
+  stepRowText: { flex: 1, fontFamily: F.sans, fontSize: 15, color: D.ink },
+  stepRowOn: { fontFamily: F.sansSemi, color: D.sun },
+  dim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(22,19,15,0.45)', justifyContent: 'flex-end', zIndex: 3000, elevation: 50 },
+  layersSheet: { backgroundColor: D.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10, paddingHorizontal: 24, gap: 14 },
+  grab: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: D.line },
+  layersTitle: { fontFamily: F.serif, fontSize: 24, color: D.ink },
+  tiles: { flexDirection: 'row', gap: 12 },
+  tile: { flex: 1, alignItems: 'center', gap: 8 },
+  tilePic: { alignSelf: 'stretch', height: 80, borderRadius: 16 },
+  tileOn: { borderWidth: 3, borderColor: D.sun },
+  tileText: { fontFamily: F.sans, fontSize: 14, color: D.ink },
+  tileTextOn: { fontFamily: F.sansSemi, color: D.sun },
   todayChip: { height: 24, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 12, backgroundColor: D.sunSoft },
   todayText: { fontFamily: F.sansSemi, fontSize: 12, color: D.sun },
   timeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, marginBottom: 8, marginLeft: -4 },

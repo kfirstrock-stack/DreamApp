@@ -46,3 +46,4 @@ Docs: https://docs.expo.dev/eas/index.md
 - Implement exactly what is drawn: elements, texts, sizes, colors, spacing. Do not add, remove or redesign anything unless the owner explicitly says what to change.
 - Before building a screen, read its frame with the Figma tools (`get_design_context`) instead of working from memory.
 - If the design is contradictory or a needed state is not drawn — ask the owner, do not invent.
+- Anything the build changes relative to the design (approved by the owner) must be carried back into Figma right away, so the file stays the reference. Superseded frames go to the «Архив» section, not deleted.

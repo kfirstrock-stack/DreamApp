@@ -62,12 +62,14 @@ export default function PhotoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const landscape = width > height;
   const { session } = useAuth();
   const uid = session?.user.id ?? null;
   const [photo, setPhoto] = useState<Photo | null>(cachedPhoto(id) ?? null);
   const [failed, setFailed] = useState<null | 'gone' | 'error'>(null);
   const [attempt, setAttempt] = useState(0);
-  const [nearby, setNearby] = useState<Photo[]>([]); // снимки этого места вокруг момента (для шкалы и «кто ещё»)
+  const [nearby, setNearby] = useState<Photo[]>([]);
+  const [nearbyLoaded, setNearbyLoaded] = useState(false); // снимки этого места вокруг момента (для шкалы и «кто ещё»)
   const [menu, setMenu] = useState<null | 'actions' | 'report'>(null);
   const [img, setImg] = useState<'loading' | 'ok' | 'error'>('loading');
 
@@ -86,7 +88,10 @@ export default function PhotoScreen() {
     const from = new Date(Math.min(r.from.getTime(), t.getTime() - 15 * 60000));
     const to = new Date(Math.max(r.to.getTime(), t.getTime() + 15 * 60000));
     fetchPhotosV2(boundsAround(photo.lat, photo.lng, 100), from, to, 300)
-      .then(setNearby)
+      .then((l) => {
+        setNearby(l);
+        setNearbyLoaded(true);
+      })
       .catch(() => {});
   }, [photo?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -172,6 +177,10 @@ export default function PhotoScreen() {
         }),
     [], // eslint-disable-line react-hooks/exhaustive-deps
   );
+  const landSV = useSharedValue(landscape ? 1 : 0);
+  useEffect(() => {
+    landSV.value = landscape ? 1 : 0;
+  }, [landscape, landSV]);
   const chromeAway = useSharedValue(0); // 1 — кнопки уехали наверх (пока щипаем или тянем фото)
   // Тап по фото прячет интерфейс: кнопки — вверх, панель — вниз; ещё тап — возвращает
   const [uiHidden, setUiHidden] = useState(false);
@@ -311,7 +320,8 @@ export default function PhotoScreen() {
     const k = Math.min(1, drag.value / (height * 0.6));
     return { opacity: 1 - k * 0.7, transform: [{ translateY: drag.value }, { scale: 1 - k * 0.2 }] };
   });
-  const coverStyle = useAnimatedStyle(() => ({ opacity: 1 - fullP.value, bottom: imgBottom.value }));
+  const coverStyle = useAnimatedStyle(() => ({ opacity: 1 - fullP.value, bottom: landSV.value ? 0 : imgBottom.value }));
+  const landStyle = useAnimatedStyle(() => ({ opacity: 1 - Math.max(fullP.value, hideP.value) }));
   const containStyle = useAnimatedStyle(() => ({
     opacity: fullP.value,
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
@@ -406,7 +416,7 @@ export default function PhotoScreen() {
             <Image
               source={photoSource(photo.storage_path)}
               style={styles.fill}
-              contentFit="cover"
+              contentFit={landscape ? 'contain' : 'cover'}
               transition={{ duration: 450, effect: 'cross-dissolve' }}
               onLoad={() => setImg('ok')}
               onError={() => setImg('error')}
@@ -419,7 +429,7 @@ export default function PhotoScreen() {
               </View>
             )}
             {/* Затемнения как в макете: сверху — под кнопки, снизу — снимок перетекает в панель автора */}
-            <Animated.View pointerEvents="none" style={[styles.shadeTopWrap, shadeStyle]}>
+            <Animated.View pointerEvents="none" style={[styles.shadeTopWrap, shadeStyle, landscape && { opacity: 0 }]}>
               <View style={styles.shadeTop} />
             </Animated.View>
             <Animated.View pointerEvents="none" style={[styles.burst, burstStyle]}>
@@ -433,14 +443,35 @@ export default function PhotoScreen() {
         </Animated.View>
       </GestureDetector>
 
-      <Animated.View style={[styles.topRow, { top: insets.top + 8 }, chromeStyle]} pointerEvents={full || uiHidden ? 'none' : 'box-none'}>
+      <Animated.View
+        style={[styles.topRow, landscape ? { top: 20, left: Math.max(16, insets.left), right: Math.max(16, insets.right) } : { top: insets.top + 8 }, chromeStyle]}
+        pointerEvents={full || uiHidden ? 'none' : 'box-none'}
+      >
         <RoundButton icon="back" tone="glass" label="Назад" onPress={() => router.back()} />
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <RoundButton icon="share" tone="glass" label="Поделиться" onPress={() => Share.share({ message: `Момент в DreamApp: ${photo.place_name ?? ''}, ${stamp(taken)}` })} />
-          <RoundButton icon="more" tone="glass" label="Ещё" onPress={() => setMenu('actions')} />
-        </View>
+        {/* F1 · одна кнопка меню: поделиться, пожаловаться, скрыть автора */}
+        <RoundButton icon="more" tone="glass" label="Меню" onPress={() => setMenu('actions')} />
       </Animated.View>
 
+      {/* F6 · горизонтальный просмотр: автор строкой внизу */}
+      {landscape && (
+        <Animated.View pointerEvents="none" style={[styles.landBottom, landStyle]}>
+          <View style={styles.landShadeTop} />
+          <View style={styles.landShadeBottom} />
+          <View style={[styles.landRow, { left: Math.max(16, insets.left), right: Math.max(16, insets.right) }]}>
+            {photo.author_avatar ? <Image source={{ uri: photo.author_avatar }} style={styles.landAva} /> : <View style={[styles.landAva, { backgroundColor: D.sun }]} />}
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.landName} numberOfLines={1}>{photo.author_name || photo.author_username || 'Путешественник'}</Text>
+              <Text style={styles.landStamp}>{stamp(taken)}</Text>
+            </View>
+            <View style={styles.like}>
+              <Icon name={photo.liked_by_me ? 'heartFill' : 'heart'} size={20} color={photo.liked_by_me ? D.sun : D.paper} />
+              <Text style={styles.likeCount}>{photo.like_count ?? 0}</Text>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+
+      {!landscape && (
       <Animated.View style={styles.sheetWrap} pointerEvents={full || uiHidden ? 'none' : 'box-none'}>
         <GestureDetector gesture={sheetPan}>
           <Animated.View style={sheetStyle} pointerEvents="box-none">
@@ -500,6 +531,14 @@ export default function PhotoScreen() {
             {/* Подробности: прячутся под ручку */}
             <Animated.View style={bodyStyle} pointerEvents={open ? 'auto' : 'none'}>
               {photo.caption ? <Text style={styles.caption}>{photo.caption}</Text> : null}
+              {nearbyLoaded && people.length === 0 && (
+                <Animated.View entering={FadeIn.duration(250)} style={styles.who}>
+                  <View style={{ flex: 1, gap: 3, paddingLeft: 6 }}>
+                    <Text style={styles.whoTitle} numberOfLines={1}>Пока вы здесь один</Text>
+                    <Text style={styles.whoSub}>±15 минут больше никто не снимал</Text>
+                  </View>
+                </Animated.View>
+              )}
               {people.length > 0 && (
                 <Animated.View entering={FadeIn.duration(250)}>
                   <Pressable onPress={openWhoElse} style={({ pressed }) => [styles.who, pressed && { opacity: 0.85 }]}>
@@ -533,7 +572,9 @@ export default function PhotoScreen() {
         </GestureDetector>
       </Animated.View>
 
-      {/* Меню ⋯ — B7 */}
+      )}
+
+      {/* Меню ⋯ — F2 / F3 / F4 */}
       {menu && (
         <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(150)} style={styles.backdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenu(null)} />
@@ -541,7 +582,15 @@ export default function PhotoScreen() {
             <View style={styles.handle} />
             {menu === 'actions' ? (
               <>
-                <MenuRow icon="flag" label="Пожаловаться на фото" danger onPress={() => setMenu('report')} />
+                <MenuRow
+                  icon="share"
+                  label="Поделиться"
+                  onPress={() => {
+                    setMenu(null);
+                    Share.share({ message: `Момент в DreamApp: ${photo.place_name ?? ''}, ${stamp(taken)}` });
+                  }}
+                />
+                {!mine && <MenuRow icon="flag" label="Пожаловаться на фото" chevron onPress={() => setMenu('report')} />}
                 {!mine && (
                   <MenuRow
                     icon="eyeOff"
@@ -571,7 +620,7 @@ export default function PhotoScreen() {
                 ))}
               </>
             )}
-            <PillButton title="Отмена" kind="quiet" onPress={() => setMenu(null)} style={{ marginTop: 10 }} />
+            <PillButton title="Отмена" kind="quiet" onPress={() => setMenu(null)} style={{ marginTop: 12, height: 54 }} />
           </Animated.View>
         </Animated.View>
       )}
@@ -579,11 +628,12 @@ export default function PhotoScreen() {
   );
 }
 
-function MenuRow({ icon, label, danger, onPress }: { icon?: IconName; label: string; danger?: boolean; onPress: () => void }) {
+function MenuRow({ icon, label, danger, chevron, onPress }: { icon?: IconName; label: string; danger?: boolean; chevron?: boolean; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.menuRow, pressed && { backgroundColor: D.paper }]}>
-      {icon && <Icon name={icon} size={20} color={danger ? D.sun : D.ink} />}
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.menuRow, pressed && { opacity: 0.6 }]}>
+      {icon && <Icon name={icon} size={22} color={danger ? D.sun : D.ink} />}
       <Text style={[styles.menuText, danger && { color: D.sun }]}>{label}</Text>
+      {chevron && <Icon name="chevR" size={14} color={D.ink60} />}
     </Pressable>
   );
 }
@@ -642,9 +692,16 @@ const styles = StyleSheet.create({
   goneTitle: { fontFamily: F.serif, fontSize: 28, color: D.paper, marginTop: 24, textAlign: 'center' },
   goneText: { fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: D.paper, opacity: 0.6, marginTop: 10, textAlign: 'center' },
   backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,14,12,0.55)', justifyContent: 'flex-end' },
-  menu: { backgroundColor: D.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 16, paddingTop: 10 },
-  handle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: D.line, marginBottom: 10 },
-  menuTitle: { fontFamily: F.serif, fontSize: 22, color: D.ink, paddingHorizontal: 8, marginBottom: 6 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 15, paddingHorizontal: 8, borderRadius: 12 },
-  menuText: { fontFamily: F.sans, fontSize: 16, color: D.ink },
+  menu: { backgroundColor: D.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 10 },
+  handle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: D.line, marginBottom: 16 },
+  menuTitle: { fontFamily: F.serif, fontSize: 24, color: D.ink, marginBottom: 8 },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 15 },
+  menuText: { flex: 1, fontFamily: F.sans, fontSize: 17, color: D.ink },
+  landBottom: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  landShadeTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 90, experimental_backgroundImage: 'linear-gradient(180deg, rgba(22,19,15,0.6) 0%, rgba(22,19,15,0) 100%)' },
+  landShadeBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, experimental_backgroundImage: 'linear-gradient(180deg, rgba(22,19,15,0) 0%, rgba(22,19,15,0.75) 100%)' },
+  landRow: { position: 'absolute', bottom: 24, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  landAva: { width: 32, height: 32, borderRadius: 16 },
+  landName: { fontFamily: F.sansSemi, fontSize: 15, color: D.paper },
+  landStamp: { fontFamily: F.mono, fontSize: 11, color: 'rgba(244,239,230,0.75)' },
 });

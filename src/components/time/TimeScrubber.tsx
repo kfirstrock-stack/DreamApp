@@ -12,7 +12,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
-import { BUCKETS, D, F, STEP_MIN } from '@/lib/design';
+import { D, F, STEP_MIN } from '@/lib/design';
 
 export const ITEM = 11; // шаг между столбиками, px
 const BAR_W = 6;
@@ -28,6 +28,7 @@ type Props = {
   sidePadding?: number; // отступ карточки от краёв экрана
   header?: ReactNode;
   footer?: ReactNode;
+  ticks?: { i: number; label: string }[]; // подписи под шкалой
 };
 
 const Bar = memo(function Bar({ i, h, x }: { i: number; h: number; x: SharedValue<number> }) {
@@ -45,8 +46,9 @@ const Bar = memo(function Bar({ i, h, x }: { i: number; h: number; x: SharedValu
 // Шкала-гистограмма суток: едет за пальцем, после броска докатывается по инерции,
 // тап по гистограмме — переход к моменту, щелчок вибрацией на каждом шаге.
 export const TimeScrubber = memo(function TimeScrubber({
-  counts, initialIndex, now, index, onIndexChange, jumpTo, sidePadding = 12, header, footer,
+  counts, initialIndex, now, index, onIndexChange, jumpTo, sidePadding = 12, header, footer, ticks,
 }: Props) {
+  const BUCKETS = counts.length;
   const { width } = useWindowDimensions();
   const innerW = width - sidePadding * 2;
   const center = innerW / 2;
@@ -152,7 +154,7 @@ export const TimeScrubber = memo(function TimeScrubber({
       <View collapsable={false}>
         {header}
         <View style={styles.wrap} onLayout={(e) => (barsTop.value = e.nativeEvent.layout.y)}>
-          <Animated.View style={[styles.content, rowStyle]}>
+          <Animated.View style={[styles.content, { width: BUCKETS * ITEM }, rowStyle]}>
             <View style={styles.bars}>
               {heights.map((h, i) => (
                 <View key={i} style={styles.slot}>
@@ -161,9 +163,9 @@ export const TimeScrubber = memo(function TimeScrubber({
               ))}
             </View>
             <View style={styles.ticks}>
-              {Array.from({ length: 13 }, (_, k) => (
-                <Text key={k} style={[styles.tick, { left: k * 8 * ITEM + ITEM / 2 - 20 }]}>
-                  {String(k * 2).padStart(2, '0')}:00
+              {(ticks ?? Array.from({ length: 13 }, (_, k) => ({ i: k * 8, label: `${String(k * 2).padStart(2, '0')}:00` }))).map((t) => (
+                <Text key={t.i} style={[styles.tick, { left: t.i * ITEM + ITEM / 2 - 20 }]}>
+                  {t.label}
                 </Text>
               ))}
             </View>
@@ -182,7 +184,7 @@ export const TimeScrubber = memo(function TimeScrubber({
 const H = Math.round(MAX_H * 1.3) + 4;
 const styles = StyleSheet.create({
   wrap: { height: H + 28, overflow: 'hidden' },
-  content: { position: 'absolute', left: 0, top: 0, width: BUCKETS * ITEM },
+  content: { position: 'absolute', left: 0, top: 0 },
   bars: { flexDirection: 'row', alignItems: 'flex-end', height: H },
   slot: { width: ITEM, alignItems: 'center', justifyContent: 'flex-end' },
   bar: { width: BAR_W, borderRadius: 2, transformOrigin: 'bottom' },
