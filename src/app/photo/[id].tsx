@@ -1,10 +1,12 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  Easing,
   FadeIn,
   FadeOut,
   SlideInDown,
@@ -52,7 +54,7 @@ const REASONS: { key: ReportReason; label: string }[] = [
 export default function PhotoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const { session } = useAuth();
   const uid = session?.user.id ?? null;
   const [photo, setPhoto] = useState<Photo | null>(cachedPhoto(id) ?? null);
@@ -100,12 +102,137 @@ export default function PhotoScreen() {
     }
   };
 
-  const doubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .onEnd(() => {
-      burst.value = withSequence(withTiming(1, { duration: 120 }), withTiming(0, { duration: 450 }));
-      scheduleOnRN(toggleLike, true);
-    });
+  // Полноэкранный просмотр: тап — спрятать всё, щипок/двойной тап — приблизить, свайп вниз — закрыть
+  const [full, setFull] = useState(false);
+  const fullP = useSharedValue(0); // 0 — обычный вид, 1 — полный экран
+  const fullSV = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const tx = useSharedValue(0);
+  const ty = useSharedValue(0);
+  const savedTx = useSharedValue(0);
+  const savedTy = useSharedValue(0);
+  const drag = useSharedValue(0);
+  const zooming = useSharedValue(0);
+  const sheetH = useSharedValue(0);
+  const imgBottom = useSharedValue(height * 0.3);
+
+  const setFullMode = useCallback(
+    (on: boolean) => {
+      setFull(on);
+      fullSV.value = on ? 1 : 0;
+      fullP.value = withTiming(on ? 1 : 0, { duration: 300, easing: Easing.out(Easing.cubic) });
+      if (!on) {
+        scale.value = withTiming(1);
+        tx.value = withTiming(0);
+        ty.value = withTiming(0);
+        savedScale.value = 1;
+        savedTx.value = 0;
+        savedTy.value = 0;
+      }
+    },
+    [fullP, fullSV, scale, tx, ty, savedScale, savedTx, savedTy],
+  );
+  const toggleFull = useCallback(() => setFullMode(fullSV.value === 0), [setFullMode, fullSV]);
+  const goBack = useCallback(() => router.back(), []);
+
+  const gesture = useMemo(() => {
+    const single = Gesture.Tap().onEnd(() => scheduleOnRN(toggleFull));
+    const double = Gesture.Tap()
+      .numberOfTaps(2)
+      .onEnd((e) => {
+        if (fullSV.value === 0) {
+          burst.value = withSequence(withTiming(1, { duration: 120 }), withTiming(0, { duration: 450 }));
+          scheduleOnRN(toggleLike, true);
+          return;
+        }
+        if (scale.value > 1.05) {
+          scale.value = withSpring(1, { damping: 18 });
+          tx.value = withSpring(0, { damping: 18 });
+          ty.value = withSpring(0, { damping: 18 });
+          savedScale.value = 1;
+          savedTx.value = 0;
+          savedTy.value = 0;
+        } else {
+          const k = 2.5; // приближаем к точке касания
+          const nx = (width / 2 - e.x) * (k - 1);
+          const ny = (height / 2 - e.y) * (k - 1);
+          scale.value = withSpring(k, { damping: 18 });
+          tx.value = withSpring(nx, { damping: 18 });
+          ty.value = withSpring(ny, { damping: 18 });
+          savedScale.value = k;
+          savedTx.value = nx;
+          savedTy.value = ny;
+        }
+      });
+    const pinch = Gesture.Pinch()
+      .onStart(() => {
+        if (fullSV.value === 0) scheduleOnRN(setFullMode, true);
+      })
+      .onUpdate((e) => {
+        scale.value = Math.min(5, Math.max(0.8, savedScale.value * e.scale));
+      })
+      .onEnd(() => {
+        if (scale.value < 1) {
+          scale.value = withSpring(1);
+          tx.value = withSpring(0);
+          ty.value = withSpring(0);
+          savedTx.value = 0;
+          savedTy.value = 0;
+        }
+        savedScale.value = Math.max(1, scale.value);
+      });
+    const pan = Gesture.Pan()
+      .activeOffsetX([-12, 12])
+      .activeOffsetY([-12, 12])
+      .onStart(() => {
+        zooming.value = scale.value > 1.05 ? 1 : 0;
+      })
+      .onUpdate((e) => {
+        if (zooming.value) {
+          tx.value = savedTx.value + e.translationX;
+          ty.value = savedTy.value + e.translationY;
+        } else {
+          drag.value = Math.max(0, e.translationY);
+        }
+      })
+      .onEnd((e) => {
+        if (zooming.value) {
+          // не даём увести снимок за края
+          const mx = (width * (scale.value - 1)) / 2;
+          const my = (height * (scale.value - 1)) / 2;
+          const cx = Math.min(mx, Math.max(-mx, tx.value));
+          const cy = Math.min(my, Math.max(-my, ty.value));
+          tx.value = withSpring(cx, { damping: 20 });
+          ty.value = withSpring(cy, { damping: 20 });
+          savedTx.value = cx;
+          savedTy.value = cy;
+          return;
+        }
+        if (drag.value > 120 || e.velocityY > 900) {
+          drag.value = withTiming(height * 0.5, { duration: 200 });
+          scheduleOnRN(goBack);
+        } else {
+          drag.value = withSpring(0, { damping: 18 });
+        }
+      });
+    return Gesture.Race(Gesture.Simultaneous(pinch, pan), Gesture.Exclusive(double, single));
+  }, [toggleFull, setFullMode, goBack, toggleLike, width, height]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const viewerStyle = useAnimatedStyle(() => {
+    const k = Math.min(1, drag.value / (height * 0.6));
+    return { opacity: 1 - k * 0.7, transform: [{ translateY: drag.value }, { scale: 1 - k * 0.2 }] };
+  });
+  const coverStyle = useAnimatedStyle(() => ({ opacity: 1 - fullP.value, bottom: imgBottom.value }));
+  const containStyle = useAnimatedStyle(() => ({
+    opacity: fullP.value,
+    transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
+  }));
+  const chromeStyle = useAnimatedStyle(() => ({ opacity: 1 - fullP.value }));
+  const sheetStyle = useAnimatedStyle(() => ({
+    opacity: 1 - Math.min(1, drag.value / 150),
+    transform: [{ translateY: fullP.value * (sheetH.value + 40) }],
+  }));
 
   if (failed === 'error' && !photo) {
     return (
@@ -139,7 +266,6 @@ export default function PhotoScreen() {
 
   const taken = new Date(photo.taken_at);
   const mine = uid === photo.user_id;
-  const imageH = height * 0.62;
   const authors = Array.from(new Map(others.map((o) => [o.user_id, o])).values()).slice(0, 4);
   const windowStart = new Date(taken);
   windowStart.setMinutes(Math.floor(taken.getMinutes() / STEP_MIN) * STEP_MIN, 0, 0);
@@ -166,89 +292,105 @@ export default function PhotoScreen() {
 
   return (
     <View style={styles.root}>
-      <GestureDetector gesture={doubleTap}>
-        <View style={{ height: imageH }} collapsable={false}>
-          {/* Снимок проявляется плавно; пока грузится — мягкий индикатор, при ошибке — понятное сообщение */}
-          <Image
-            source={photoSource(photo.storage_path)}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            transition={{ duration: 450, effect: 'cross-dissolve' }}
-            onLoad={() => setImg('ok')}
-            onError={() => setImg('error')}
-          />
-          {img === 'loading' && <ActivityIndicator style={styles.imgState} color={D.paper} />}
-          {img === 'error' && (
-            <View style={styles.imgState}>
-              <Icon name="eyeOff" size={28} color={D.paper} />
-              <Text style={styles.imgErr}>Снимок не загрузился</Text>
+      <StatusBar style="light" hidden={full} animated />
+      <GestureDetector gesture={gesture}>
+        <Animated.View style={[styles.viewer, viewerStyle]} collapsable={false}>
+          {/* Обычный вид: снимок над панелью автора */}
+          <Animated.View style={[styles.cover, coverStyle]}>
+            <Image
+              source={photoSource(photo.storage_path)}
+              style={styles.fill}
+              contentFit="cover"
+              transition={{ duration: 450, effect: 'cross-dissolve' }}
+              onLoad={() => setImg('ok')}
+              onError={() => setImg('error')}
+            />
+            {img === 'loading' && <ActivityIndicator style={styles.imgState} color={D.paper} />}
+            {img === 'error' && (
+              <View style={styles.imgState}>
+                <Icon name="eyeOff" size={28} color={D.paper} />
+                <Text style={styles.imgErr}>Снимок не загрузился</Text>
+              </View>
+            )}
+            <View style={styles.shadeTop} />
+            <Animated.View pointerEvents="none" style={[styles.burst, burstStyle]}>
+              <Icon name="heartFill" size={96} color={D.sun} />
+            </Animated.View>
+            <View style={styles.stamp}>
+              <Text style={styles.stampText}>{stamp(taken)}</Text>
             </View>
-          )}
-          <View style={[styles.shadeTop]} />
-          <Animated.View pointerEvents="none" style={[styles.burst, burstStyle]}>
-            <Icon name="heartFill" size={96} color={D.sun} />
           </Animated.View>
-          <View style={styles.stamp}>
-            <Text style={styles.stampText}>{stamp(taken)}</Text>
-          </View>
-        </View>
+          {/* Полный экран: снимок целиком, можно приближать */}
+          <Animated.View pointerEvents="none" style={[styles.fill, containStyle]}>
+            <Image source={photoSource(photo.storage_path)} style={styles.fill} contentFit="contain" />
+          </Animated.View>
+        </Animated.View>
       </GestureDetector>
 
-      <View style={[styles.topRow, { top: insets.top + 8 }]}>
+      <Animated.View style={[styles.topRow, { top: insets.top + 8 }, chromeStyle]} pointerEvents={full ? 'none' : 'box-none'}>
         <RoundButton icon="back" tone="glass" label="Назад" onPress={() => router.back()} />
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <RoundButton icon="share" tone="glass" label="Поделиться" onPress={() => Share.share({ message: `Момент в DreamApp: ${photo.place_name ?? ''}, ${stamp(taken)}` })} />
           <RoundButton icon="more" tone="glass" label="Ещё" onPress={() => setMenu('actions')} />
         </View>
-      </View>
+      </Animated.View>
 
-      <Animated.View entering={SlideInDown.springify().damping(16).stiffness(140).mass(0.9)} style={[styles.sheet, { paddingBottom: insets.bottom + 16, top: imageH - 28 }]}>
-        <View style={styles.authorRow}>
-          {photo.author_avatar ? <Image source={{ uri: photo.author_avatar }} style={styles.avatar} /> : <View style={[styles.avatar, { backgroundColor: D.sun }]} />}
-          <View style={{ flex: 1 }}>
-            <Text style={styles.author}>{photo.author_name || photo.author_username || 'Путешественник'}</Text>
-            <Text style={styles.sub}>
-              снял в {pad(taken.getHours())}:{pad(taken.getMinutes())} · {ago(taken)}
-            </Text>
-          </View>
-          <Pressable onPress={() => toggleLike()} hitSlop={10} style={styles.like} accessibilityLabel={photo.liked_by_me ? 'Убрать лайк' : 'Лайк'}>
-            <Animated.View style={heartStyle}>
-              <Icon name={photo.liked_by_me ? 'heartFill' : 'heart'} size={22} color={photo.liked_by_me ? D.sun : D.paper} />
-            </Animated.View>
-            <Text style={styles.likeCount}>{photo.like_count ?? 0}</Text>
-          </Pressable>
-        </View>
-
-        {photo.place_name ? (
-          <View style={styles.placeRow}>
-            <Icon name="pin" size={15} color={D.sun} />
-            <Text style={styles.place}>{photo.place_name}</Text>
-          </View>
-        ) : null}
-        {photo.caption ? <Text style={styles.caption}>{photo.caption}</Text> : null}
-
-        {others.length > 0 && (
-          <View>
-            <Pressable onPress={openWhoElse} style={styles.who}>
-              <View style={styles.avas}>
-                {authors.map((o, k) =>
-                  o.author_avatar ? (
-                    <Image key={o.user_id} source={{ uri: o.author_avatar }} style={[styles.whoAva, { marginLeft: k ? -10 : 0, zIndex: 10 - k }]} />
-                  ) : (
-                    <View key={o.user_id} style={[styles.whoAva, { marginLeft: k ? -10 : 0, backgroundColor: D.sun }]} />
-                  ),
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.whoTitle}>Ещё {others.length} {plural(others.length, 'снимок', 'снимка', 'снимков')}</Text>
-                <Text style={styles.whoSub}>здесь ±15 минут — может, вы в кадре?</Text>
-              </View>
-              <View style={styles.go}>
-                <Icon name="arrow" size={16} color={D.white} />
-              </View>
+      <Animated.View
+        entering={SlideInDown.springify().damping(16).stiffness(140).mass(0.9)}
+        style={styles.sheetWrap}
+        pointerEvents={full ? 'none' : 'box-none'}
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          const first = sheetH.value === 0;
+          sheetH.value = h;
+          imgBottom.value = first ? h - 28 : withTiming(h - 28, { duration: 250 });
+        }}
+      >
+        <Animated.View style={[styles.sheet, { paddingBottom: insets.bottom + 12 }, sheetStyle]}>
+          <View style={styles.authorRow}>
+            {photo.author_avatar ? <Image source={{ uri: photo.author_avatar }} style={styles.avatar} /> : <View style={[styles.avatar, { backgroundColor: D.sun }]} />}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.author}>{photo.author_name || photo.author_username || 'Путешественник'}</Text>
+              <Text style={styles.sub} numberOfLines={1}>
+                снял в {pad(taken.getHours())}:{pad(taken.getMinutes())} · {ago(taken)}
+              </Text>
+            </View>
+            <Pressable onPress={() => toggleLike()} hitSlop={10} style={styles.like} accessibilityLabel={photo.liked_by_me ? 'Убрать лайк' : 'Лайк'}>
+              <Animated.View style={heartStyle}>
+                <Icon name={photo.liked_by_me ? 'heartFill' : 'heart'} size={22} color={photo.liked_by_me ? D.sun : D.paper} />
+              </Animated.View>
+              <Text style={styles.likeCount}>{photo.like_count ?? 0}</Text>
             </Pressable>
           </View>
-        )}
+
+          {photo.place_name ? (
+            <View style={styles.placeRow}>
+              <Icon name="pin" size={15} color={D.sun} />
+              <Text style={styles.place} numberOfLines={1}>{photo.place_name}</Text>
+            </View>
+          ) : null}
+          {photo.caption ? <Text style={styles.caption}>{photo.caption}</Text> : null}
+
+          {others.length > 0 && (
+            <Animated.View entering={FadeIn.duration(250)}>
+              <Pressable onPress={openWhoElse} style={styles.who}>
+                <View style={styles.avas}>
+                  {authors.map((o, k) =>
+                    o.author_avatar ? (
+                      <Image key={o.user_id} source={{ uri: o.author_avatar }} style={[styles.whoAva, { marginLeft: k ? -8 : 0, zIndex: 10 - k }]} />
+                    ) : (
+                      <View key={o.user_id} style={[styles.whoAva, { marginLeft: k ? -8 : 0, backgroundColor: D.sun }]} />
+                    ),
+                  )}
+                </View>
+                <Text style={styles.whoTitle} numberOfLines={1}>
+                  Ещё {others.length} {plural(others.length, 'снимок', 'снимка', 'снимков')} здесь <Text style={styles.whoSub}>±15 мин</Text>
+                </Text>
+                <Icon name="chevR" size={14} color={D.paper} />
+              </Pressable>
+            </Animated.View>
+          )}
+        </Animated.View>
       </Animated.View>
 
       {/* Меню ⋯ — B7 */}
@@ -316,14 +458,18 @@ function plural(n: number, one: string, few: string, many: string) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: D.night },
   center: { alignItems: 'center', justifyContent: 'center' },
+  fill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  viewer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  cover: { position: 'absolute', top: 0, left: 0, right: 0 },
+  sheetWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   shadeTop: { position: 'absolute', left: 0, right: 0, top: 0, height: 130, backgroundColor: 'rgba(15,14,12,0.35)' },
   burst: { position: 'absolute', alignSelf: 'center', top: '40%' },
   imgState: { position: 'absolute', alignSelf: 'center', top: '42%', alignItems: 'center', gap: 8 },
   imgErr: { fontFamily: F.sans, fontSize: 14, color: D.paper, opacity: 0.7 },
   stamp: { position: 'absolute', left: 16, bottom: 44, backgroundColor: 'rgba(15,14,12,0.55)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   stampText: { fontFamily: F.mono, fontSize: 11, color: D.paper, letterSpacing: 0.6 },
-  topRow: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between' },
-  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: D.night2, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 22, gap: 12 },
+  topRow: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', zIndex: 10 },
+  sheet: { backgroundColor: D.night2, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 18, gap: 10 },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: { width: 44, height: 44, borderRadius: 22 },
   author: { fontFamily: F.sansSemi, fontSize: 16, color: D.paper },
@@ -333,12 +479,11 @@ const styles = StyleSheet.create({
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   place: { fontFamily: F.sans, fontSize: 14, color: D.paper, opacity: 0.85 },
   caption: { fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: D.paper },
-  who: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: D.night3, borderRadius: 20, padding: 14, marginTop: 4 },
+  who: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: D.night3, borderRadius: 16, paddingVertical: 9, paddingHorizontal: 12, marginTop: 2 },
   avas: { flexDirection: 'row' },
-  whoAva: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: D.night3 },
-  whoTitle: { fontFamily: F.sansSemi, fontSize: 15, color: D.paper },
-  whoSub: { fontFamily: F.sans, fontSize: 13, color: D.paper, opacity: 0.55, marginTop: 2 },
-  go: { width: 36, height: 36, borderRadius: 18, backgroundColor: D.sun, alignItems: 'center', justifyContent: 'center' },
+  whoAva: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: D.night3 },
+  whoTitle: { flex: 1, fontFamily: F.sansMedium, fontSize: 14, color: D.paper },
+  whoSub: { fontFamily: F.sans, fontSize: 13, color: 'rgba(244,239,230,0.55)' },
   goneIcon: { width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(244,239,230,0.08)', alignItems: 'center', justifyContent: 'center' },
   goneTitle: { fontFamily: F.serif, fontSize: 28, color: D.paper, marginTop: 24, textAlign: 'center' },
   goneText: { fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: D.paper, opacity: 0.6, marginTop: 10, textAlign: 'center' },

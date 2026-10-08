@@ -7,6 +7,7 @@ import Animated, { FadeIn, FadeOut, useSharedValue } from 'react-native-reanimat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { MomentLayer, PIN, type Pin } from '@/components/map/MomentLayer';
+import { StackFan } from '@/components/map/StackFan';
 import { RollingTime } from '@/components/time/RollingTime';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
 import { PillButton } from '@/components/ui/PillButton';
@@ -74,6 +75,7 @@ export default function MapScreen() {
   const [loaded, setLoaded] = useState(false);
   const [offline, setOffline] = useState(false);
   const [reload, setReload] = useState(0);
+  const [fan, setFan] = useState<{ photos: Photo[]; origin: { x: number; y: number }; closing: boolean } | null>(null);
   const firstFocus = useRef(true);
 
   // Регион, при котором точка встаёт посередине свободной зоны — между поиском и карточкой шкалы
@@ -159,41 +161,52 @@ export default function MapScreen() {
   }, [photos, day]);
 
   // Фото рядом по времени (±2,5 часа) + стопки среди снимков текущего интервала
-  const pins = useMemo<Pin[]>(() => {
-    if (!size.w) return [];
+  const { pins, groups } = useMemo(() => {
+    const groups = new Map<string, Photo[]>();
+    if (!size.w) return { pins: [] as Pin[], groups };
     const ms = day.getTime();
     const centre = index * STEP_MIN + STEP_MIN / 2;
     const near = photos
       .map((p) => ({ p, minutes: (new Date(p.taken_at).getTime() - ms) / 60000 }))
       .filter((o) => Math.abs(o.minutes - centre) <= 150);
-    const inWindow = near
-      .filter((o) => Math.floor(o.minutes / STEP_MIN) === index)
-      .sort((a, b) => (b.p.like_count ?? 0) - (a.p.like_count ?? 0));
-    const xy = new Map(inWindow.map((o) => [o.p.id, project(o.p.lat, o.p.lng, region, size.w, size.h)]));
-    const leaders = new Map<string, number>();
+    const xy = new Map(near.map((o) => [o.p.id, project(o.p.lat, o.p.lng, region, size.w, size.h)]));
+    const isActive = (m: number) => Math.floor(m / STEP_MIN) === index;
+    const inWindow = near.filter((o) => isActive(o.minutes)).sort((a, b) => (b.p.like_count ?? 0) - (a.p.like_count ?? 0));
     const hidden = new Set<string>();
     for (const o of inWindow) {
       if (hidden.has(o.p.id)) continue;
       const a = xy.get(o.p.id)!;
-      let n = 0;
+      const group = [o.p];
       for (const q of inWindow) {
-        if (q === o || hidden.has(q.p.id) || leaders.has(q.p.id)) continue;
+        if (q === o || hidden.has(q.p.id) || groups.has(q.p.id)) continue;
         const b = xy.get(q.p.id)!;
         if (Math.hypot(a.x - b.x, a.y - b.y) < PIN * 0.9) {
           hidden.add(q.p.id);
-          n++;
+          group.push(q.p);
         }
       }
-      leaders.set(o.p.id, n);
+      groups.set(o.p.id, group);
     }
-    return near.map((o) => ({
-      photo: o.p,
-      minutes: o.minutes,
-      active: Math.floor(o.minutes / STEP_MIN) === index,
-      suppressed: hidden.has(o.p.id),
-      badge: leaders.get(o.p.id) ?? 0,
-    }));
-  }, [photos, day, index, region, size]);
+    // соседние по времени снимки не налезают на снимки текущего интервала
+    const leaders = [...groups.keys()].map((id) => xy.get(id)!);
+    const fanIds = new Set(fan?.photos.map((p) => p.id));
+    const pins: Pin[] = near.map((o) => {
+      const active = isActive(o.minutes);
+      const a = xy.get(o.p.id)!;
+      const covered = !active && leaders.some((b) => Math.hypot(a.x - b.x, a.y - b.y) < PIN);
+      const g = groups.get(o.p.id);
+      return {
+        photo: o.p,
+        minutes: o.minutes,
+        active,
+        suppressed: hidden.has(o.p.id) || covered || fanIds.has(o.p.id),
+        badge: g ? g.length - 1 : 0,
+        under1: g?.[1]?.storage_path,
+        under2: g?.[2]?.storage_path,
+      };
+    });
+    return { pins, groups };
+  }, [photos, day, index, region, size, fan]);
 
   const windowFrom = day.getTime() + index * STEP_MIN * 60000;
   const openMoment = useCallback(
@@ -204,11 +217,19 @@ export default function MapScreen() {
       }),
     [windowFrom],
   );
+  const openPhoto = useCallback((p: Photo) => router.push({ pathname: '/photo/[id]', params: { id: p.id } }), []);
+  // Тап по снимку: одиночный — открыть; стопка до 5 — раскрыть веером; больше — лента момента
   const onPinPress = useCallback(
-    (p: Photo, isStack: boolean) =>
-      isStack ? openMoment(p.lat, p.lng, 120, p.place_name) : router.push({ pathname: '/photo/[id]', params: { id: p.id } }),
-    [openMoment],
+    (p: Photo) => {
+      const g = groups.get(p.id) ?? [p];
+      if (g.length <= 1) return openPhoto(p);
+      if (g.length > 5) return openMoment(p.lat, p.lng, 120, p.place_name);
+      setFan({ photos: g, origin: project(p.lat, p.lng, regionSV.value, size.w, size.h), closing: false });
+    },
+    [groups, openPhoto, openMoment, regionSV, size],
   );
+  const closeFan = useCallback(() => setFan((f) => (f ? { ...f, closing: true } : f)), []);
+  const fanClosed = useCallback(() => setFan(null), []);
 
   const locateMe = async () => {
     const perm = await Location.requestForegroundPermissionsAsync();
@@ -332,6 +353,28 @@ export default function MapScreen() {
         onAdd={() => router.push(session ? '/add' : '/sign-in')}
         onProfile={() => router.push(session ? '/profile' : '/sign-in')}
       />
+
+      {fan && (
+        <StackFan
+          photos={fan.photos}
+          origin={fan.origin}
+          width={size.w}
+          top={insets.top + 70}
+          bottom={sheet.y || size.h * 0.6}
+          closing={fan.closing}
+          onClose={closeFan}
+          onClosed={fanClosed}
+          onPick={(p) => {
+            setFan(null);
+            openPhoto(p);
+          }}
+          onAll={() => {
+            const p = fan.photos[0];
+            setFan(null);
+            openMoment(p.lat, p.lng, 120, p.place_name);
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -346,8 +389,8 @@ const styles = StyleSheet.create({
   banner: { position: 'absolute', alignSelf: 'center', backgroundColor: D.ink, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, zIndex: 1000, elevation: 30 },
   bannerText: { fontFamily: F.sansMedium, fontSize: 13, color: D.paper },
   empty: {
-    position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: D.white,
-    paddingLeft: 18, paddingRight: 8, paddingVertical: 8, borderRadius: 999, ...softShadow, zIndex: 1000, elevation: 30,
+    position: 'absolute', alignSelf: 'center', alignItems: 'center', gap: 10, backgroundColor: D.white,
+    padding: 16, borderRadius: 20, ...softShadow, zIndex: 1000, elevation: 30,
   },
   emptyTitle: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink },
   sheet: {
