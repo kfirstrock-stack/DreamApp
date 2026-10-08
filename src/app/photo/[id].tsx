@@ -138,6 +138,7 @@ export default function PhotoScreen() {
   const sheetPeek = useSharedValue(0); // сколько видно в свёрнутом виде
   const off = useSharedValue(0); // насколько панель опущена (0 — открыта)
   const offStart = useSharedValue(0);
+  const sheetDragging = useSharedValue(0);
   const openSV = useSharedValue(sheetOpenPref ? 1 : 0);
   const enter = useSharedValue(1); // выезд панели при открытии: 1 — за краем экрана, 0 — на месте
   const remember = useCallback((o: boolean) => {
@@ -158,6 +159,7 @@ export default function PhotoScreen() {
         .failOffsetX([-20, 20])
         .onStart(() => {
           offStart.value = off.value;
+          sheetDragging.value = 1;
         })
         .onUpdate((e) => {
           const m = Math.max(0, sheetFull.value - sheetPeek.value);
@@ -166,7 +168,10 @@ export default function PhotoScreen() {
           if (v > m) v = m + (v - m) * 0.25;
           off.value = v;
         })
-        .onEnd((e) => {
+        // onFinalize, а не onEnd: срабатывает и когда жест прерван (иначе панель застревала на полпути)
+        .onFinalize((e) => {
+          if (!sheetDragging.value) return;
+          sheetDragging.value = 0;
           const m = Math.max(0, sheetFull.value - sheetPeek.value);
           const o = e.velocityY < -400 ? true : e.velocityY > 400 ? false : off.value < m / 2;
           const changed = (openSV.value === 1) !== o;
@@ -488,7 +493,9 @@ export default function PhotoScreen() {
               const first = sheetFull.value === 0;
               sheetFull.value = h;
               if (first) enter.value = withSpring(0, SHEET_SPRING);
+              if (sheetDragging.value) return; // пока панель держат пальцем — не трогаем
               if (openSV.value === 0) off.value = first ? Math.max(0, h - sheetPeek.value) : withTiming(Math.max(0, h - sheetPeek.value));
+              else if (off.value > 0.5) off.value = withSpring(0, SHEET_SPRING); // открыта — значит до конца
             }}
           >
             {/* Шапка: видна всегда */}
@@ -497,7 +504,7 @@ export default function PhotoScreen() {
                 const peek = e.nativeEvent.layout.y + e.nativeEvent.layout.height + insets.bottom + 12;
                 sheetPeek.value = peek;
                 imgBottom.value = peek - 28;
-                if (openSV.value === 0 && sheetFull.value) off.value = Math.max(0, sheetFull.value - peek);
+                if (openSV.value === 0 && sheetFull.value && !sheetDragging.value) off.value = Math.max(0, sheetFull.value - peek);
               }}
             >
               <Pressable onPress={toggleSheet} style={styles.grip} hitSlop={{ top: 10, bottom: 6 }} accessibilityRole="button" accessibilityLabel={open ? 'Свернуть подробности' : 'Показать подробности'}>
