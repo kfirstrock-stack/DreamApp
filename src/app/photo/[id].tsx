@@ -134,6 +134,7 @@ export default function PhotoScreen() {
   const off = useSharedValue(0); // насколько панель опущена (0 — открыта)
   const offStart = useSharedValue(0);
   const openSV = useSharedValue(sheetOpenPref ? 1 : 0);
+  const enter = useSharedValue(1); // выезд панели при открытии: 1 — за краем экрана, 0 — на месте
   const SHEET_SPRING = { damping: 20, stiffness: 210, mass: 0.8 };
   const remember = useCallback((o: boolean) => {
     sheetOpenPref = o;
@@ -322,7 +323,7 @@ export default function PhotoScreen() {
   const shadeStyle = useAnimatedStyle(() => ({ opacity: 1 - Math.max(chromeAway.value, hideP.value) }));
   const sheetStyle = useAnimatedStyle(() => ({
     opacity: 1 - Math.min(1, drag.value / 150),
-    transform: [{ translateY: off.value + Math.max(fullP.value, hideP.value) * (sheetFull.value - off.value + 40) }],
+    transform: [{ translateY: off.value + Math.max(fullP.value, hideP.value, enter.value) * (sheetFull.value - off.value + 40) }],
   }));
   // насколько панель открыта: 0…1
   const openness = () => {
@@ -334,11 +335,6 @@ export default function PhotoScreen() {
   // ручка: открыто — ровная черта, свёрнуто — стрелка «вверх»
   const gripL = useAnimatedStyle(() => ({ transform: [{ rotate: `${-18 * (1 - openness())}deg` }] }));
   const gripR = useAnimatedStyle(() => ({ transform: [{ rotate: `${18 * (1 - openness())}deg` }] }));
-  // дата и нижнее затемнение едут вместе с верхним краем панели
-  const riseStyle = useAnimatedStyle(() => ({
-    opacity: 1 - Math.max(fullP.value, hideP.value),
-    transform: [{ translateY: -(sheetFull.value - off.value) * (1 - hideP.value) }],
-  }));
 
   if (failed === 'error' && !photo) {
     return (
@@ -430,12 +426,6 @@ export default function PhotoScreen() {
               <Icon name="heartFill" size={96} color={D.sun} />
             </Animated.View>
           </Animated.View>
-          <Animated.View pointerEvents="none" style={[styles.rise, riseStyle]}>
-            <View style={styles.shadeBottom} />
-            <View style={styles.stamp}>
-              <Text style={styles.stampText}>{stamp(taken)}</Text>
-            </View>
-          </Animated.View>
           {/* Полный экран: снимок целиком, можно приближать */}
           <Animated.View pointerEvents="none" style={[styles.fill, containStyle]}>
             <Image source={photoSource(photo.storage_path)} style={styles.fill} contentFit="contain" />
@@ -451,14 +441,23 @@ export default function PhotoScreen() {
         </View>
       </Animated.View>
 
-      <Animated.View entering={SlideInDown.springify().damping(16).stiffness(140).mass(0.9)} style={styles.sheetWrap} pointerEvents={full || uiHidden ? 'none' : 'box-none'}>
+      <Animated.View style={styles.sheetWrap} pointerEvents={full || uiHidden ? 'none' : 'box-none'}>
         <GestureDetector gesture={sheetPan}>
-          <Animated.View
-            style={[styles.sheet, { paddingBottom: insets.bottom + 12 }, sheetStyle]}
+          <Animated.View style={sheetStyle} pointerEvents="box-none">
+            {/* Над панелью: нижнее затемнение снимка и дата — едут вместе с панелью */}
+            <View pointerEvents="none" style={styles.zone}>
+              <View style={styles.shadeBottom} />
+              <View style={styles.stamp}>
+                <Text style={styles.stampText}>{stamp(taken)}</Text>
+              </View>
+            </View>
+          <View
+            style={[styles.sheet, { paddingBottom: insets.bottom + 12 }]}
             onLayout={(e) => {
               const h = e.nativeEvent.layout.height;
               const first = sheetFull.value === 0;
               sheetFull.value = h;
+              if (first) enter.value = withSpring(0, { damping: 16, stiffness: 140, mass: 0.9 });
               if (openSV.value === 0) off.value = first ? Math.max(0, h - sheetPeek.value) : withTiming(Math.max(0, h - sheetPeek.value));
             }}
           >
@@ -529,6 +528,7 @@ export default function PhotoScreen() {
                 <MomentStrip taken={taken} times={times} onPress={openWhoElse} />
               </View>
             </Animated.View>
+          </View>
           </Animated.View>
         </GestureDetector>
       </Animated.View>
@@ -608,9 +608,8 @@ const styles = StyleSheet.create({
     experimental_backgroundImage: 'linear-gradient(180deg, rgba(15,14,12,0.7) 0%, rgba(15,14,12,0) 100%)',
   },
   // 160 px градиента до края панели + 28 px, которые уходят под её скругление
-  rise: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 0 },
   shadeBottom: {
-    position: 'absolute', left: 0, right: 0, bottom: -28, height: 188,
+    position: 'absolute', left: 0, right: 0, top: 0, height: 188,
     experimental_backgroundImage: 'linear-gradient(180deg, rgba(15,14,12,0) 0%, rgba(15,14,12,0.9) 85%, rgba(15,14,12,0.9) 100%)',
   },
   burst: { position: 'absolute', alignSelf: 'center', top: '40%' },
@@ -619,6 +618,7 @@ const styles = StyleSheet.create({
   stamp: { position: 'absolute', left: 16, bottom: 6, backgroundColor: 'rgba(15,14,12,0.55)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   stampText: { fontFamily: F.mono, fontSize: 11, color: D.paper, letterSpacing: 0.6 },
   topRow: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', zIndex: 10 },
+  zone: { height: 160 }, // 160 px градиента над панелью (+28 уходят под её скругление)
   sheet: { backgroundColor: D.night2, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20 },
   grip: { height: 28, flexDirection: 'row', justifyContent: 'center', paddingTop: 10 },
   gripHalf: { width: 19.5, height: 4, borderRadius: 2, backgroundColor: 'rgba(244,239,230,0.2)' },
