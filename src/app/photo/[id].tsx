@@ -181,7 +181,7 @@ export default function PhotoScreen() {
       setUiHidden(hide);
       hideSV.value = hide ? 1 : 0;
       hideP.value = hide
-        ? withTiming(1, { duration: 240, easing: Easing.out(Easing.cubic) })
+        ? withTiming(1, { duration: 450, easing: Easing.inOut(Easing.cubic) }) // уходят неторопливо
         : withSpring(0, { damping: 16, stiffness: 180, mass: 0.8 });
     },
     [hideSV, hideP],

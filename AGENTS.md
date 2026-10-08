@@ -39,3 +39,10 @@ Docs: https://docs.expo.dev/eas/index.md
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
 - Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+
+## Design — strictly as drawn
+
+- Figma file `XiAfl1LWK4iZjQ9g5S1OtN` is the source of truth: page «MVP — user flows» (15:2) for screens and flows, «DreamApp — новое видение» (7:2) for the visual style.
+- Implement exactly what is drawn: elements, texts, sizes, colors, spacing. Do not add, remove or redesign anything unless the owner explicitly says what to change.
+- Before building a screen, read its frame with the Figma tools (`get_design_context`) instead of working from memory.
+- If the design is contradictory or a needed state is not drawn — ask the owner, do not invent.
