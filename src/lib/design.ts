@@ -1,4 +1,4 @@
-// Дизайн-токены концепции «Слои времени» (Figma → страница «DreamApp — новое видение»)
+// Дизайн-токены концепции «Слои времени» (Figma → «DreamApp — новое видение»)
 export const D = {
   paper: '#F4EFE6',
   paper2: '#EAE3D6',
@@ -9,6 +9,8 @@ export const D = {
   sun: '#FF5A36',
   sunSoft: '#FFE1D6',
   night: '#0F0E0C',
+  night2: '#1C1A17',
+  night3: '#2A2723',
   white: '#FFFFFF',
   mapBase: '#ECE5D8',
 };
@@ -29,3 +31,15 @@ export const softShadow = {
   shadowOffset: { width: 0, height: 8 },
   elevation: 8,
 };
+
+export const lightShadow = {
+  shadowColor: '#17120D',
+  shadowOpacity: 0.12,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 4,
+};
+
+// Шаг шкалы времени — 15 минут, 96 интервалов в сутках
+export const STEP_MIN = 15;
+export const BUCKETS = (24 * 60) / STEP_MIN;

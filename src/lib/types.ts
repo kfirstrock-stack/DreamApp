@@ -9,6 +9,9 @@ export type Photo = {
   lng: number;
   place_name: string | null;
   caption: string | null;
+  like_count?: number;
+  liked_by_me?: boolean;
+  hidden?: boolean;
   author_username: string | null;
   author_name: string | null;
   author_avatar: string | null;
