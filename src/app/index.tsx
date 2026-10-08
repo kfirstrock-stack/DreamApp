@@ -7,7 +7,7 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native
 import { Image } from 'expo-image';
 import MapView from 'react-native-maps';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition, SlideInDown, SlideOutDown, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition, SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -117,6 +117,8 @@ export default function MapScreen() {
     if (i >= 0 && i < order.length) setMode(order[i]);
   };
   const gripTap = () => setMode(mode === 'full' ? 'compact' : 'full');
+  const sheetDrag = useSharedValue(0);
+  const sheetDragStyle = useAnimatedStyle(() => ({ transform: [{ translateY: sheetDrag.value }] }));
   const anchor = useRef(new Date());
   const [mapStyle, setMapStyle] = useState<MapStyle>(mapStylePref);
   const [layers, setLayers] = useState(false);
@@ -196,7 +198,7 @@ export default function MapScreen() {
     now.value = withTiming(i * STEP_MIN + STEP_MIN / 2, { duration: 260 });
     Haptics.selectionAsync().catch(() => {});
   };
-  const miniGesture = Gesture.Exclusive(
+  const miniGesture = Gesture.Race(
     Gesture.Pan()
       .activeOffsetX([-14, 14])
       .failOffsetY([-14, 14])
@@ -209,7 +211,7 @@ export default function MapScreen() {
       .onEnd((e) => {
         if (e.translationY < -20) scheduleOnRN(setMode, 'compact');
       }),
-    Gesture.Tap().onEnd(() => scheduleOnRN(setMode, 'full')),
+    Gesture.Tap().maxDistance(8).onEnd(() => scheduleOnRN(setMode, 'full')),
   );
   const chooseMapStyle = (m: MapStyle) => {
     mapStylePref = m;
@@ -534,28 +536,30 @@ export default function MapScreen() {
       {/* Карточка шкалы времени: полная (S1), компактная (S2) или одна строка (S3) */}
       <Animated.View
         layout={LinearTransition.springify().damping(SHEET_SPRING.damping).stiffness(SHEET_SPRING.stiffness).mass(SHEET_SPRING.mass)}
-        style={[styles.sheet, mode === 'mini' && styles.sheetMini, { bottom: sheetBottom }]}
+        style={[styles.sheet, mode === 'mini' && styles.sheetMini, { bottom: sheetBottom }, sheetDragStyle]}
         onLayout={(e) => setSheet({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}
       >
-        <ScaleGrip mode={mode} onTap={gripTap} onSwipe={gripSwipe} nudge={nudge && mode === 'full'} />
+        <ScaleGrip mode={mode} onTap={gripTap} onSwipe={gripSwipe} nudge={nudge && mode === 'full'} drag={sheetDrag} />
         {mode === 'mini' ? (
-          <GestureDetector gesture={miniGesture}>
-            <Animated.View key="mini" entering={FadeIn.duration(220)} style={styles.miniRow}>
-              <Text style={styles.miniTime}>{clockStep ? clock(step, start, index) : bigLabel(step, start, index)}</Text>
-              <Text style={styles.miniMeta} numberOfLines={1}>
-                {rangeLabel(step, start).replace(/ \d{4}$/, '')} · {inWindow} фото
-              </Text>
-              <View style={{ flex: 1 }} />
-              <Pressable onPress={() => setStepMenu((v) => !v)} style={styles.stepChip} hitSlop={6} accessibilityLabel="Шаг шкалы">
-                <Text style={styles.stepText}>{STEPS.find((x) => x.key === step)!.chip}</Text>
-                <Icon name="chevD" size={14} color={D.ink} />
-              </Pressable>
-            </Animated.View>
-          </GestureDetector>
+          <Animated.View key="mini" entering={FadeIn.duration(220)} style={styles.miniRow}>
+            {/* свайп по строке — соседний интервал; вверх или тап — раскрыть */}
+            <GestureDetector gesture={miniGesture}>
+              <View style={styles.miniSwipe} collapsable={false}>
+                <Text style={styles.miniTime}>{clockStep ? clock(step, start, index) : bigLabel(step, start, index)}</Text>
+                <Text style={styles.miniMeta} numberOfLines={1}>
+                  {rangeLabel(step, start).replace(/ \d{4}$/, '')} · {inWindow} фото
+                </Text>
+              </View>
+            </GestureDetector>
+            <Pressable onPress={() => setStepMenu((v) => !v)} style={styles.stepChip} hitSlop={6} accessibilityLabel="Шаг шкалы">
+              <Text style={styles.stepText}>{STEPS.find((x) => x.key === step)!.chip}</Text>
+              <Icon name="chevD" size={14} color={D.ink} />
+            </Pressable>
+          </Animated.View>
         ) : (
-          <Animated.View key={mode} entering={FadeIn.duration(220)}>
+          <Animated.View key="scale" entering={FadeIn.duration(220)}>
             <TimeScrubber
-              key={`${step}:${counts.length}:${mode}`}
+              key={`${step}:${counts.length}`}
               compact={mode === 'compact'}
               ticks={ticks(step, start)}
               counts={counts}
@@ -743,6 +747,7 @@ const styles = StyleSheet.create({
   sheetMini: { paddingTop: 0, paddingBottom: 0 },
   miniRow: { height: 64, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20 },
   miniTime: { fontFamily: F.serif, fontSize: 28, color: D.ink },
+  miniSwipe: { flex: 1, height: 64, flexDirection: 'row', alignItems: 'center', gap: 10 },
   miniMeta: { flexShrink: 1, fontFamily: F.mono, fontSize: 11, color: D.ink60, letterSpacing: 0.66 },
   head: { paddingHorizontal: 20 },
   dayRow: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 27 },

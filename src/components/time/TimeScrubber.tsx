@@ -160,7 +160,7 @@ export const TimeScrubber = memo(function TimeScrubber({
         {header}
         <View style={[styles.wrap, { height: compact ? H + 10 : H + 28 }]} onLayout={(e) => (barsTop.value = e.nativeEvent.layout.y)}>
           {/* T2 · «окно интервала»: мягкая капсула под выбранным столбиком, на всю высоту шкалы */}
-          <View pointerEvents="none" style={[styles.window, { height: H + 6, width: compact ? 11 : 13, borderRadius: compact ? 5.5 : 6.5, left: center - (compact ? 5.5 : 6.5) }]} />
+          <View pointerEvents="none" style={[styles.window, { top: 6 + H - maxH - 6, height: maxH + 9, width: compact ? 11 : 13, borderRadius: compact ? 5.5 : 6.5, left: center - (compact ? 5.5 : 6.5) }]} />
           <Animated.View style={[styles.content, { width: BUCKETS * ITEM }, rowStyle]}>
             <View style={[styles.bars, { height: H, marginTop: 6 }]}>
               {heights.map((h, i) => (
