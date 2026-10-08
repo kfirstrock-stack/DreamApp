@@ -50,7 +50,7 @@ export async function fetchTimeBuckets(b: Bounds, g: Granularity, from: Date, to
 }
 
 const SELECT_WITH_AUTHOR =
-  'id,user_id,storage_path,width,height,taken_at,lat,lng,place_name,caption,profiles(username,display_name,avatar_url)';
+  'id,user_id,storage_path,width,height,taken_at,lat,lng,place_name,caption,profiles!photos_user_id_fkey(username,display_name,avatar_url)';
 
 function flatten(row: any): Photo {
   const { profiles, ...rest } = row;
@@ -173,7 +173,7 @@ export function boundsAround(lat: number, lng: number, meters: number): Bounds {
 export async function fetchPhotoFull(id: string, userId?: string | null): Promise<Photo | null> {
   const { data, error } = await supabase
     .from('photos')
-    .select('id,user_id,storage_path,width,height,taken_at,lat,lng,place_name,caption,like_count,hidden,profiles(username,display_name,avatar_url)')
+    .select('id,user_id,storage_path,width,height,taken_at,lat,lng,place_name,caption,like_count,hidden,profiles!photos_user_id_fkey(username,display_name,avatar_url)')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;

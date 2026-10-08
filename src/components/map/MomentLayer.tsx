@@ -21,12 +21,12 @@ type Props = {
   width: number;
   height: number;
   now: SharedValue<number>;
-  onPress: (photo: Photo) => void;
+  onPress: (photo: Photo, isStack: boolean) => void;
 };
 
 export const PIN = 56;
 
-type PinProps = Pin & { region: SharedValue<MapRegion>; width: number; height: number; now: SharedValue<number>; onPress: (p: Photo) => void };
+type PinProps = Pin & { region: SharedValue<MapRegion>; width: number; height: number; now: SharedValue<number>; onPress: (p: Photo, isStack: boolean) => void };
 
 // Пропсы — простые значения: при шаге шкалы перерисовываются только фото, у которых что-то поменялось
 const MomentPin = memo(function MomentPin({ photo, minutes, active, suppressed, badge, region, width, height, now, onPress }: PinProps) {
@@ -48,7 +48,7 @@ const MomentPin = memo(function MomentPin({ photo, minutes, active, suppressed, 
 
   return (
     <Animated.View style={[styles.pin, pos]} pointerEvents={active && !suppressed ? 'box-none' : 'none'}>
-      <Pressable onPress={() => onPress(photo)} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Фото в ${time}${badge ? `, ещё ${badge}` : ''}`}>
+      <Pressable onPress={() => onPress(photo, badge > 0)} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Фото в ${time}${badge ? `, ещё ${badge}` : ''}`}>
         {badge > 0 && <View style={[styles.frame, styles.under]} />}
         <View style={[styles.frame, { borderColor: active ? D.sun : D.white }]}>
           <Image source={{ uri: photoUrl(photo.storage_path) }} style={styles.img} contentFit="cover" cachePolicy="memory-disk" recyclingKey={photo.id} />

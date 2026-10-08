@@ -179,7 +179,11 @@ export default function MapScreen() {
       }),
     [windowFrom],
   );
-  const onPinPress = useCallback((p: Photo) => openMoment(p.lat, p.lng, 120, p.place_name), [openMoment]);
+  const onPinPress = useCallback(
+    (p: Photo, isStack: boolean) =>
+      isStack ? openMoment(p.lat, p.lng, 120, p.place_name) : router.push({ pathname: '/photo/[id]', params: { id: p.id } }),
+    [openMoment],
+  );
 
   const locateMe = async () => {
     const perm = await Location.requestForegroundPermissionsAsync();
@@ -267,11 +271,15 @@ export default function MapScreen() {
                   <Icon name="chevR" size={16} color={isToday ? D.line : D.ink60} />
                 </Pressable>
                 <View style={{ flex: 1 }} />
-                {!isToday && (
-                  <Pressable onPress={() => goTo(new Date())} style={styles.todayChip} hitSlop={6}>
-                    <Text style={styles.todayText}>Сейчас</Text>
-                  </Pressable>
-                )}
+                <Pressable
+                  onPress={() => goTo(new Date())}
+                  disabled={isToday}
+                  style={[styles.todayChip, isToday && { opacity: 0 }]}
+                  hitSlop={6}
+                  accessibilityElementsHidden={isToday}
+                >
+                  <Text style={styles.todayText}>Сейчас</Text>
+                </Pressable>
               </View>
               <View style={styles.timeRow}>
                 <RollingTime index={indexSV} step={STEP_MIN} size={50} />
@@ -315,9 +323,9 @@ const styles = StyleSheet.create({
     position: 'absolute', left: 12, right: 12, backgroundColor: D.white, borderRadius: 28, paddingTop: 16, paddingBottom: 6, ...softShadow, zIndex: 1000, elevation: 30,
   },
   head: { paddingHorizontal: 18 },
-  dayRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  day: { fontFamily: F.mono, fontSize: 11, color: D.ink60, letterSpacing: 1.1 },
-  todayChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: D.sunSoft },
+  dayRow: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 26 },
+  day: { fontFamily: F.mono, fontSize: 11, color: D.ink60, letterSpacing: 1.1, minWidth: 196, textAlign: 'center' },
+  todayChip: { height: 24, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 12, backgroundColor: D.sunSoft },
   todayText: { fontFamily: F.sansSemi, fontSize: 12, color: D.sun },
   timeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, marginBottom: 8, marginLeft: -4 },
   timeMeta: { marginLeft: 12, marginTop: 8 },

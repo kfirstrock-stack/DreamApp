@@ -57,15 +57,17 @@ export default function PhotoScreen() {
   const { session } = useAuth();
   const uid = session?.user.id ?? null;
   const [photo, setPhoto] = useState<Photo | null>(cachedPhoto(id) ?? null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<null | 'gone' | 'error'>(null);
+  const [attempt, setAttempt] = useState(0);
   const [others, setOthers] = useState<Photo[]>([]);
   const [menu, setMenu] = useState<null | 'actions' | 'report'>(null);
 
   useEffect(() => {
+    setFailed(null);
     fetchPhotoFull(id, uid)
-      .then((p) => (p ? setPhoto(p) : setFailed(true)))
-      .catch(() => setFailed(true));
-  }, [id, uid]);
+      .then((p) => (p ? setPhoto(p) : setFailed('gone')))
+      .catch(() => setFailed((f) => (cachedPhoto(id) ? null : 'error'))); // есть копия из ленты — показываем её
+  }, [id, uid, attempt]);
 
   // Кто ещё снимал это место ±15 минут
   useEffect(() => {
@@ -105,7 +107,17 @@ export default function PhotoScreen() {
       scheduleOnRN(toggleLike, true);
     });
 
-  if (failed || photo?.hidden) {
+  if (failed === 'error' && !photo) {
+    return (
+      <View style={[styles.root, styles.center, { padding: 32 }]}>
+        <Text style={styles.goneTitle}>Не удалось загрузить фото</Text>
+        <Text style={styles.goneText}>Проверьте интернет и попробуйте ещё раз.</Text>
+        <PillButton title="Повторить" onPress={() => setAttempt((a) => a + 1)} style={{ marginTop: 24, alignSelf: 'stretch' }} />
+        <PillButton title="Назад" kind="quiet" onPress={() => router.back()} style={{ marginTop: 10, alignSelf: 'stretch' }} />
+      </View>
+    );
+  }
+  if (failed === 'gone' || photo?.hidden) {
     return (
       <View style={[styles.root, styles.center, { padding: 32 }]}>
         <View style={styles.goneIcon}>
