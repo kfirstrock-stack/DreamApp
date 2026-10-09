@@ -38,6 +38,7 @@ const ICONS = {
   eyeOff: { ios: 'eye.slash', android: 'visibility_off' },
   calendar: { ios: 'calendar', android: 'calendar_month' },
   arrow: { ios: 'arrow.right', android: 'arrow_forward' },
+  sparkle: { ios: 'sparkle', android: 'auto_awesome' },
 } as const;
 
 export type IconName = keyof typeof ICONS;

@@ -132,3 +132,18 @@ export function agoDays(at: number) {
   const w = m10 === 1 && m100 !== 11 ? 'день' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'дня' : 'дней';
   return `${n} ${w} назад`;
 }
+
+/** Адрес точки для C3/C4: «Исаакиевская площадь, 4» и короткое название места */
+export async function reverseAddress(lat: number, lng: number): Promise<{ address: string | null; place: string | null }> {
+  try {
+    const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}&limit=1`, { headers: { Accept: 'application/json' } });
+    const p = (await res.json())?.features?.[0]?.properties;
+    if (!p) return { address: null, place: null };
+    const street = p.street ? (p.housenumber ? `${p.street}, ${p.housenumber}` : p.street) : null;
+    const named = p.name && p.osm_key !== 'building' ? p.name : null;
+    const address = p.housenumber && (p.street || named) ? `${p.street ?? named}, ${p.housenumber}` : street ?? named ?? p.city ?? null;
+    return { address, place: named ?? p.street ?? p.district ?? p.city ?? null };
+  } catch {
+    return { address: null, place: null };
+  }
+}

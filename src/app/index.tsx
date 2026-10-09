@@ -668,7 +668,7 @@ export default function MapScreen() {
         active="map"
         onMap={() => {}}
         onMoments={() => openMoment(region.latitude, region.longitude, regionRadiusM(region))}
-        onAdd={() => router.push(session ? '/add' : '/sign-in')}
+        onAdd={() => router.push('/new')}
         onProfile={() => router.push(session ? '/profile' : '/sign-in')}
       />
 

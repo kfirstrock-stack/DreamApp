@@ -147,7 +147,7 @@ export default function MomentScreen() {
         active="moments"
         onMap={() => router.dismissTo('/')}
         onMoments={() => {}}
-        onAdd={() => router.push(session ? '/add' : '/sign-in')}
+        onAdd={() => router.push('/new')}
         onProfile={() => router.push(session ? '/profile' : '/sign-in')}
       />
     </View>

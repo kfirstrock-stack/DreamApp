@@ -45,6 +45,13 @@
         }
       ],
       [
+        "expo-media-library",
+        {
+          "photosPermission": "DreamApp показывает ваши недавние снимки, чтобы их можно было выложить на карту.",
+          "savePhotosPermission": "DreamApp сохраняет снимки в вашу галерею."
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "DreamApp определяет, где сделан снимок, и показывает фото рядом с вами."
