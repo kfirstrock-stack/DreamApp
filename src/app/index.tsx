@@ -14,6 +14,7 @@ import { Icon } from '@/components/Icon';
 import { HALO, MomentLayer, PIN, type Pin } from '@/components/map/MomentLayer';
 import { StackFan } from '@/components/map/StackFan';
 import { RollingTime } from '@/components/time/RollingTime';
+import { DateSheet } from '@/components/time/DateSheet';
 import { ScaleGrip, type ScaleMode } from '@/components/time/ScaleGrip';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
 import { PillButton } from '@/components/ui/PillButton';
@@ -122,6 +123,7 @@ export default function MapScreen() {
   const anchor = useRef(new Date());
   const [mapStyle, setMapStyle] = useState<MapStyle>(mapStylePref);
   const [layers, setLayers] = useState(false);
+  const [dateSheet, setDateSheet] = useState(false); // B3 · «Когда?»
   const indexSV = useSharedValue(index);
   const now = useSharedValue(index * STEP_MIN + STEP_MIN / 2);
   const [jump, setJump] = useState<{ i: number; key: number } | null>(null);
@@ -597,7 +599,10 @@ export default function MapScreen() {
                 <Pressable hitSlop={10} onPress={() => setStart((st) => shiftRange(step, st, -1))} accessibilityLabel="Назад">
                   <Icon name="chevL" size={16} color={D.ink60} />
                 </Pressable>
-                <Text style={styles.day}>{rangeLabel(step, start)}</Text>
+                {/* B3: тап по дате — выбор даты и времени */}
+                <Pressable hitSlop={{ top: 10, bottom: 10 }} onPress={() => setDateSheet(true)} accessibilityRole="button" accessibilityLabel="Выбрать дату и время">
+                  <Text style={styles.day}>{rangeLabel(step, start)}</Text>
+                </Pressable>
                 <Pressable hitSlop={10} disabled={isToday} onPress={() => setStart((st) => shiftRange(step, st, 1))} accessibilityLabel="Вперёд">
                   <Icon name="chevR" size={16} color={isToday ? D.line : D.ink60} />
                 </Pressable>
@@ -688,6 +693,24 @@ export default function MapScreen() {
             </View>
           </Animated.View>
         </Animated.View>
+      )}
+
+      {/* B3 · выбор даты и времени */}
+      {dateSheet && (
+        <DateSheet
+          step={step}
+          moment={(() => {
+            const a = bucketStart(step, start, index), b = bucketStart(step, start, index + 1);
+            return anchor.current >= a && anchor.current < b ? anchor.current : a;
+          })()}
+          bounds={regionBounds(region, 1.6)}
+          onClose={() => setDateSheet(false)}
+          onPick={(at) => {
+            setDateSheet(false);
+            anchor.current = at;
+            goTo(at);
+          }}
+        />
       )}
 
       {fan && (

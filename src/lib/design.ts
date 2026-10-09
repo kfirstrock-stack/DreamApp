@@ -22,6 +22,7 @@ export const F = {
   sansMedium: 'Onest_500Medium',
   sansSemi: 'Onest_600SemiBold',
   mono: 'JetBrainsMono_500Medium',
+  monoRegular: 'JetBrainsMono_400Regular',
 };
 
 export const softShadow = {

@@ -1,4 +1,4 @@
-import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono';
+import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono';
 import { Onest_400Regular, Onest_500Medium, Onest_600SemiBold } from '@expo-google-fonts/onest';
 import { PlayfairDisplay_400Regular, PlayfairDisplay_400Regular_Italic } from '@expo-google-fonts/playfair-display';
 import { useFonts } from 'expo-font';
@@ -19,6 +19,7 @@ export default function RootLayout() {
     Onest_400Regular,
     Onest_500Medium,
     Onest_600SemiBold,
+    JetBrainsMono_400Regular,
     JetBrainsMono_500Medium,
   });
   useEffect(() => {
