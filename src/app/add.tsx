@@ -39,7 +39,8 @@ type View3 = 'confirm' | 'place' | 'time' | 'done';
 export default function PublishScreen() {
   const { session } = useAuth();
   const [draft, setD] = useState<Draft | null>(() => getDraft());
-  const [place, setPlace] = useState<string | null>(null);
+  const [place, setPlace] = useState<string | null>(null); // название места — в базу (группировка, поиск)
+  const [address, setAddress] = useState<string | null>(null); // адрес с номером дома — в C3, как на карте C4
   const [caption, setCaption] = useState('');
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState<{ at: Date; lat: number; lng: number; people: Photo[] } | null>(null);
@@ -52,7 +53,10 @@ export default function PublishScreen() {
   }, [draft]);
   useEffect(() => {
     if (draft?.lat == null || draft.lng == null) return;
-    reverseAddress(draft.lat, draft.lng).then((a) => setPlace(a.place));
+    reverseAddress(draft.lat, draft.lng).then((a) => {
+      setPlace(a.place);
+      setAddress(a.address);
+    });
   }, [draft?.lat, draft?.lng]);
   if (!draft) return null;
 
@@ -100,9 +104,10 @@ export default function PublishScreen() {
         draft={draft}
         noGeo={draft.lat == null}
         onCancel={() => (draft.lat == null ? router.back() : setView('confirm'))}
-        onPick={(lat, lng, name) => {
+        onPick={(lat, lng, a) => {
           update({ lat, lng, locationSource: 'manual' });
-          if (name) setPlace(name);
+          if (a.place) setPlace(a.place);
+          if (a.address) setAddress(a.address);
           setView(draft.takenAt == null ? 'time' : 'confirm');
         }}
       />
@@ -121,6 +126,7 @@ export default function PublishScreen() {
     <Confirm
       draft={draft}
       place={place}
+      address={address}
       found={found.current}
       caption={caption}
       setCaption={setCaption}
@@ -136,6 +142,7 @@ export default function PublishScreen() {
 function Confirm(p: {
   draft: Draft;
   place: string | null;
+  address: string | null;
   found: boolean;
   caption: string;
   setCaption: (s: string) => void;
@@ -185,7 +192,7 @@ function Confirm(p: {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.foundTitle} numberOfLines={1}>
-                {p.place ?? 'Место на карте'}
+                {p.address ?? p.place ?? 'Место на карте'}
               </Text>
               <Text style={styles.foundSub}>
                 {coords(draft.lat!, draft.lng!)}, {coordsLng(draft.lng!)} · {draft.locationSource === 'manual' ? 'на карте' : 'GPS'}
@@ -214,7 +221,7 @@ function Confirm(p: {
 }
 
 /** C4 · Место на карте: карта двигается под булавкой, адрес — обратным геокодированием */
-function PlacePicker({ draft, noGeo, onCancel, onPick }: { draft: Draft; noGeo: boolean; onCancel: () => void; onPick: (lat: number, lng: number, name: string | null) => void }) {
+function PlacePicker({ draft, noGeo, onCancel, onPick }: { draft: Draft; noGeo: boolean; onCancel: () => void; onPick: (lat: number, lng: number, a: { address: string | null; place: string | null }) => void }) {
   const insets = useSafeAreaInsets();
   const map = useRef<MapView>(null);
   const start: Region = { latitude: draft.lat ?? 59.9341, longitude: draft.lng ?? 30.3061, latitudeDelta: 0.006, longitudeDelta: 0.006 };
@@ -285,7 +292,7 @@ function PlacePicker({ draft, noGeo, onCancel, onPick }: { draft: Draft; noGeo: 
           <Text style={styles.addrCoords}>
             {coords(at.lat, at.lng)} · {coordsLng(at.lng)}
           </Text>
-          <Pressable onPress={() => onPick(at.lat, at.lng, addr.place)} style={({ pressed }) => [styles.button, { marginTop: 24 }, pressed && { opacity: 0.88 }]}>
+          <Pressable onPress={() => onPick(at.lat, at.lng, addr)} style={({ pressed }) => [styles.button, { marginTop: 24 }, pressed && { opacity: 0.88 }]}>
             <Text style={styles.buttonText}>Снимок сделан здесь</Text>
           </Pressable>
           <Pressable onPress={onCancel} hitSlop={10} style={{ alignSelf: 'center', marginTop: 18 }}>
