@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -22,7 +22,6 @@ const BG = 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&
 // Вход по коду из письма (макет «Вход»)
 export default function SignInScreen() {
   const insets = useSafeAreaInsets();
-  const { next } = useLocalSearchParams<{ next?: string }>(); // C1 → вход → обратно в C2
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'email' | 'code'>('email');
@@ -47,8 +46,6 @@ export default function SignInScreen() {
     setBusy(false);
     if (error) return setError('Код не подошёл. Проверьте его или запросите новый.');
     router.back();
-    // C1 → вход → сразу C2: открываем лист, когда окно входа закрылось
-    if (next === 'new') setTimeout(() => router.push('/new'), 400);
   };
 
   return (

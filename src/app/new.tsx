@@ -40,11 +40,8 @@ export default function NewMomentSheet() {
 
 /** C1: войти, чтобы публиковать */
 function Guest({ onClose }: { onClose: () => void }) {
-  // прозрачный лист нельзя заменить полноэкранным окном — сначала закрываем лист, потом открываем вход
-  const signIn = () => {
-    router.back();
-    setTimeout(() => router.push({ pathname: '/sign-in', params: { next: 'new' } }), 60);
-  };
+  // вход открывается поверх листа; после входа лист сам станет C2 (сессия появилась)
+  const signIn = () => router.push('/sign-in');
   const [avatars, setAvatars] = useState<string[]>([]);
   useEffect(() => {
     supabase
