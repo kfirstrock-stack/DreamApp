@@ -97,7 +97,7 @@ export default function PublishScreen() {
     }
   };
 
-  if (view === 'done' && done) return <Published draft={draft} place={place} done={done} />;
+  if (view === 'done' && done) return <Published draft={draft} place={place} address={address} done={done} />;
   if (view === 'place')
     return (
       <PlacePicker
@@ -362,10 +362,11 @@ function TimePicker({ draft, onDone }: { draft: Draft; onDone: (at: Date) => voi
 }
 
 /** C6 · Момент на карте (и «рядом никого» — утверждено 09.10) */
-function Published({ draft, place, done }: { draft: Draft; place: string | null; done: { at: Date; lat: number; lng: number; people: Photo[] } }) {
+function Published({ draft, place, address, done }: { draft: Draft; place: string | null; address: string | null; done: { at: Date; lat: number; lng: number; people: Photo[] } }) {
   const insets = useSafeAreaInsets();
   const n = done.people.length;
-  const shortPlace = useMemo(() => (place ?? '').replace(/площадь/i, 'пл.').toUpperCase(), [place]);
+  // как в C3: адрес с номером дома («ИСААКИЕВСКАЯ ПЛ., 4»)
+  const shortPlace = useMemo(() => (address ?? place ?? '').replace(/площадь/i, 'пл.').toUpperCase(), [address, place]);
   const toMap = () => {
     requestMapFocus({ lat: done.lat, lng: done.lng, at: done.at });
     router.dismissTo('/');
