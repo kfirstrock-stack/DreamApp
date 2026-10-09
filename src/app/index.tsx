@@ -23,6 +23,7 @@ import { TAB_BAR_SPACE, TabBar } from '@/components/ui/TabBar';
 import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING, STEP_MIN, softShadow } from '@/lib/design';
 import { consumeMapFocus } from '@/lib/focus';
+import { isOnboarded } from '@/lib/onboarding';
 import { project, regionBounds, regionRadiusM, type MapRegion } from '@/lib/geo';
 import { fetchLatestIn, fetchPhotosV2 } from '@/lib/photos';
 import {
@@ -89,7 +90,7 @@ const plural = (n: number, one: string, few: string, many: string) => {
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
-  const { session } = useAuth();
+  const { session, ready } = useAuth();
   const mapRef = useRef<MapView>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [sheet, setSheet] = useState({ y: 0, h: 0 }); // где карточка шкалы — фото ставим выше неё
@@ -222,6 +223,15 @@ export default function MapScreen() {
     mapStylePref = m;
     setMapStyle(m);
   };
+
+  // Первый запуск без входа — онбординг A1–A3 → вход A4 (один раз)
+  const onboardChecked = useRef(false);
+  useEffect(() => {
+    if (!ready || onboardChecked.current) return;
+    onboardChecked.current = true;
+    if (session) return;
+    isOnboarded().then((done) => !done && router.push('/welcome'));
+  }, [ready, session]);
 
   // При старте — к последнему моменту, где здесь есть фото: и карта, и шкала
   const started = useRef(false);

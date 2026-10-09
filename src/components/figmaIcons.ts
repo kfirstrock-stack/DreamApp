@@ -1,5 +1,6 @@
 // Сгенерировано из Figma (страница «MVP — user flows», слои icon/*): сетка 24×24
 export const FIGMA_ICONS: Record<string, [number, number, number, string][]> = {
+ "lock": [[4, 11, 1.8, "M 2 0 L 14 0 C 15.1 0 16 0.9 16 2 L 16 8 C 16 9.1 15.1 10 14 10 L 2 10 C 0.9 10 0 9.1 0 8 L 0 2 C 0 0.9 0.9 0 2 0 Z"], [8, 3, 1.8, "M 0 8 L 0 4 C 0 1.79 1.79 0 4 0 C 6.21 0 8 1.79 8 4 L 8 8"]],
  "sparkle": [[5, 3, 2, "M 7 0 L 8.8 5.2 L 14 7 L 8.8 8.8 L 7 14 L 5.2 8.8 L 0 7 L 5.2 5.2 Z"]],
  "pin": [
   [
@@ -337,4 +338,4 @@ export const FIGMA_ICONS: Record<string, [number, number, number, string][]> = {
  ]
 };
 
-export const ICON_ALIAS: Record<string, string> = {"back": "back", "chevL": "chevL", "chevR": "chevR", "chevD": "chevDown", "close": "close", "search": "search", "layers": "layers", "locate": "locate", "map": "map", "grid": "grid", "plus": "plus", "person": "user", "camera": "camera", "gallery": "image", "heart": "heart", "heartFill": "heart", "share": "share", "more": "more", "flag": "flag", "eyeOff": "eyeOff", "trash": "trash", "check": "check", "mail": "mail", "clock": "clock", "pin": "pin", "arrow": "arrow", "calendar": "calendar", "sparkle": "sparkle"};
+export const ICON_ALIAS: Record<string, string> = {"back": "back", "chevL": "chevL", "chevR": "chevR", "chevD": "chevDown", "close": "close", "search": "search", "layers": "layers", "locate": "locate", "map": "map", "grid": "grid", "plus": "plus", "person": "user", "camera": "camera", "gallery": "image", "heart": "heart", "heartFill": "heart", "share": "share", "more": "more", "flag": "flag", "eyeOff": "eyeOff", "trash": "trash", "check": "check", "mail": "mail", "clock": "clock", "pin": "pin", "arrow": "arrow", "calendar": "calendar", "sparkle": "sparkle", "lock": "lock"};

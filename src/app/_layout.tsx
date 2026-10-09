@@ -40,6 +40,9 @@ export default function RootLayout() {
           <Stack.Screen name="add" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="new" options={{ presentation: 'transparentModal', animation: 'none', contentStyle: { backgroundColor: 'transparent' } }} />
           <Stack.Screen name="sign-in" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />
+          <Stack.Screen name="profile-setup" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
+          <Stack.Screen name="permissions" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
           <Stack.Screen name="proto" />
           <Stack.Screen
             name="menu"

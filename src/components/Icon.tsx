@@ -39,6 +39,7 @@ const ICONS = {
   calendar: { ios: 'calendar', android: 'calendar_month' },
   arrow: { ios: 'arrow.right', android: 'arrow_forward' },
   sparkle: { ios: 'sparkle', android: 'auto_awesome' },
+  lock: { ios: 'lock', android: 'lock' },
 } as const;
 
 export type IconName = keyof typeof ICONS;
