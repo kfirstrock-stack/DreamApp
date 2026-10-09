@@ -36,6 +36,7 @@ export default function RootLayout() {
           <Stack.Screen name="moment" />
           <Stack.Screen name="photo/[id]" options={{ animation: 'fade', contentStyle: { backgroundColor: D.night }, orientation: 'all' }} />
           <Stack.Screen name="profile" />
+          <Stack.Screen name="search" options={{ animation: 'fade', animationDuration: 200 }} />
           <Stack.Screen name="add" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="sign-in" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="proto" />

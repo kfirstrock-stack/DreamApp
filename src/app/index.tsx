@@ -487,7 +487,7 @@ export default function MapScreen() {
 
       {/* Верх: поиск (название места) и слои — B1 */}
       <View style={[styles.top, { top: insets.top + 8 }]} pointerEvents="box-none">
-        <Pressable style={styles.search} onPress={() => Alert.alert('Поиск мест', 'Появится в следующем шаге.')}>
+        <Pressable style={styles.search} onPress={() => router.push({ pathname: '/search', params: { lat: String(region.latitude), lng: String(region.longitude) } })}>
           <Icon name="search" size={20} color={D.ink} />
           <Text style={[styles.searchText, !placeName && { color: D.ink60 }]} numberOfLines={1}>
             {placeName ?? 'Найти место'}
