@@ -171,7 +171,7 @@ function Confirm(p: {
               <Icon name="calendar" size={18} color={D.sun} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.foundTitle} numberOfLines={1}>
+              <Text style={styles.foundTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 {longDate(t)}, {hhmm(t)}
               </Text>
               <Text style={styles.foundSub}>{draft.timeSource === 'manual' ? 'указано вручную · можно поправить' : 'из данных снимка · можно поправить'}</Text>
