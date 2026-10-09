@@ -121,7 +121,7 @@ function A2({ width, onSkip, onNext }: { width: number; onSkip: () => void; onNe
       <View onLayout={onText} style={[styles.textBlock, { bottom: insets.bottom + 91 }]}>
         <Text style={styles.step}>02 / 03</Text>
         <Text style={styles.title}>Выбирайте не только «где», но и «когда»</Text>
-        <Text style={styles.body}>Листайте время с точностью до 15 минут и смотрите, что происходило здесь год или пять лет назад.</Text>
+        <Text style={styles.body}>Листайте время с точностью до 15{' '}минут и смотрите, что происходило здесь год или пять лет назад.</Text>
       </View>
       <Bottom i={1} dark={false} onNext={onNext} />
     </View>
