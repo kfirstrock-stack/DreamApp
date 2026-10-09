@@ -43,7 +43,10 @@ export default function SignIn() {
 function EmailStep({ email, setEmail, busy, error, onSend }: { email: string; setEmail: (s: string) => void; busy: boolean; error: string | null; onSend: () => void }) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const s = Math.min(width / 393, height / 852);
+  // на невысоких экранах полароиды уменьшаются, чтобы до «DreamApp» оставались 32 pt, как в макете
+  const [textTop, setTextTop] = useState<number | null>(null);
+  const fit = textTop == null ? 1 : (textTop - 32 - insets.top) / (374 - 47);
+  const s = Math.min(width / 393, height / 852, fit);
   const dx = (width - 393 * s) / 2;
   const at = (x: number, y: number, w: number, h: number) => ({ position: 'absolute' as const, left: dx + x * s, top: insets.top + (y - 47) * s, width: w * s, height: h * s });
   const guest = async () => {
@@ -63,7 +66,7 @@ function EmailStep({ email, setEmail, busy, error, onSend }: { email: string; se
         </View>
       </View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.bottom} keyboardVerticalOffset={-insets.bottom + 16}>
-        <View style={{ paddingHorizontal: 32, paddingBottom: Math.max(insets.bottom - 3, 12) }}>
+        <View onLayout={(e) => setTextTop(height - e.nativeEvent.layout.height)} style={{ paddingHorizontal: 32, paddingBottom: Math.max(insets.bottom - 3, 12) }}>
           <Text style={styles.brand}>DreamApp</Text>
           <Text style={styles.a4Title}>Каждое место помнит всех, кто там был</Text>
           <Text style={styles.a4Body}>Выкладывайте снимки с местом и временем — и находите себя на чужих фото.</Text>

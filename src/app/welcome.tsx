@@ -17,11 +17,14 @@ const ART = {
   a3dash: require('../../assets/onboarding/a3-dash.png'),
 };
 
-// Иллюстрации — в координатах макета (393×852), масштабируются под экран
-function useArt() {
+// Иллюстрации — в координатах макета (393×852), масштабируются под экран.
+// На невысоких экранах (iPhone XS) уменьшаем их ещё, чтобы до текста оставался отступ из макета.
+function useArt(artBottom: number, gap: number) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const s = Math.min(width / 393, height / 852);
+  const [textTop, setTextTop] = useState<number | null>(null);
+  const fit = textTop == null ? 1 : (textTop - gap - insets.top) / (artBottom - 47);
+  const s = Math.min(width / 393, height / 852, fit);
   const dx = (width - 393 * s) / 2;
   const at = (x: number, y: number, w: number, h: number) => ({
     position: 'absolute' as const,
@@ -30,7 +33,8 @@ function useArt() {
     width: w * s,
     height: h * s,
   });
-  return { at, s, insets };
+  const onText = (e: { nativeEvent: { layout: { y: number } } }) => setTextTop(e.nativeEvent.layout.y);
+  return { at, s, insets, onText };
 }
 
 export default function Welcome() {
@@ -108,13 +112,13 @@ function A1({ width, onSkip, onNext }: { width: number; onSkip: () => void; onNe
 }
 
 function A2({ width, onSkip, onNext }: { width: number; onSkip: () => void; onNext: () => void }) {
-  const { at, insets } = useArt();
+  const { at, insets, onText } = useArt(460, 40); // карточка времени → «02 / 03»
   return (
     <View style={{ width, flex: 1, backgroundColor: D.paper }}>
       <Skip dark={false} onPress={onSkip} />
       <Image source={ART.a2map} style={at(32, 100, 329, 300)} contentFit="contain" />
       <Image source={ART.a2time} style={at(22, 320, 349, 180)} contentFit="contain" />
-      <View style={[styles.textBlock, { bottom: insets.bottom + 91 }]}>
+      <View onLayout={onText} style={[styles.textBlock, { bottom: insets.bottom + 91 }]}>
         <Text style={styles.step}>02 / 03</Text>
         <Text style={styles.title}>Выбирайте не только «где», но и «когда»</Text>
         <Text style={styles.body}>Листайте время до минуты и смотрите, что происходило здесь год или пять лет назад.</Text>
@@ -125,7 +129,7 @@ function A2({ width, onSkip, onNext }: { width: number; onSkip: () => void; onNe
 }
 
 function A3({ width, onStart }: { width: number; onStart: () => void }) {
-  const { at, s, insets } = useArt();
+  const { at, s, insets, onText } = useArt(428, 42); // чип расстояния → «03 / 03»
   return (
     <View style={{ width, flex: 1, backgroundColor: D.paper }}>
       <Image source={ART.a3left} style={at(14.56, 84.44, 249, 285.33)} contentFit="contain" />
@@ -136,7 +140,7 @@ function A3({ width, onStart }: { width: number; onStart: () => void }) {
           <Text style={styles.chipText}>≈ 60 м · 2 минуты</Text>
         </View>
       </View>
-      <View style={[styles.textBlock, { bottom: insets.bottom + 125 }]}>
+      <View onLayout={onText} style={[styles.textBlock, { bottom: insets.bottom + 125 }]}>
         <Text style={styles.step}>03 / 03</Text>
         <Text style={styles.title}>Найдите себя на чужих фото</Text>
         <Text style={styles.body}>Сравним место и время ваших снимков с чужими и покажем, где вы могли попасть в кадр.</Text>
