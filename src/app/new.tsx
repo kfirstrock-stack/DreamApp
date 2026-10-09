@@ -40,6 +40,11 @@ export default function NewMomentSheet() {
 
 /** C1: войти, чтобы публиковать */
 function Guest({ onClose }: { onClose: () => void }) {
+  // прозрачный лист нельзя заменить полноэкранным окном — сначала закрываем лист, потом открываем вход
+  const signIn = () => {
+    router.back();
+    setTimeout(() => router.push({ pathname: '/sign-in', params: { next: 'new' } }), 60);
+  };
   const [avatars, setAvatars] = useState<string[]>([]);
   useEffect(() => {
     supabase
@@ -58,7 +63,7 @@ function Guest({ onClose }: { onClose: () => void }) {
       </View>
       <Text style={styles.gateTitle}>Войдите, чтобы опубликовать момент</Text>
       <Text style={styles.gateText}>Смотреть карту можно и так. А чтобы выложить снимок и найти совпадения, нужен профиль — это 30 секунд.</Text>
-      <Pressable onPress={() => router.replace({ pathname: '/sign-in', params: { next: 'new' } })} style={({ pressed }) => [styles.button, { marginTop: 26 }, pressed && { opacity: 0.88 }]}>
+      <Pressable onPress={signIn} style={({ pressed }) => [styles.button, { marginTop: 26 }, pressed && { opacity: 0.88 }]}>
         <Text style={styles.buttonText}>Войти по почте</Text>
       </Pressable>
       <Pressable onPress={onClose} hitSlop={10} style={styles.later}>

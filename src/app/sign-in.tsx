@@ -46,8 +46,9 @@ export default function SignInScreen() {
     const { error } = await supabase.auth.verifyOtp({ email: email.trim().toLowerCase(), token: code.trim(), type: 'email' });
     setBusy(false);
     if (error) return setError('Код не подошёл. Проверьте его или запросите новый.');
-    if (next === 'new') router.replace('/new');
-    else router.back();
+    router.back();
+    // C1 → вход → сразу C2: открываем лист, когда окно входа закрылось
+    if (next === 'new') setTimeout(() => router.push('/new'), 400);
   };
 
   return (
