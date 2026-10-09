@@ -47,3 +47,4 @@ Docs: https://docs.expo.dev/eas/index.md
 - Before building a screen, read its frame with the Figma tools (`get_design_context`) instead of working from memory.
 - If the design is contradictory or a needed state is not drawn — ask the owner, do not invent.
 - Anything the build changes relative to the design (approved by the owner) must be carried back into Figma right away, so the file stays the reference. Superseded frames go to the «Архив» section, not deleted.
+- Watch spacing and touch targets on every screen, in Figma and in the build, and fix them without waiting to be asked: a primary button and a secondary link/button next to it need at least 20 pt between them; tap targets at least 44 pt; text must not be clipped or wrap where the design has one line (check narrow phones like iPhone XS, 375 pt). Carry each such fix into Figma as usual.
