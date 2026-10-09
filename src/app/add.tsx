@@ -420,14 +420,15 @@ function Published({ draft, place, address, done }: { draft: Draft; place: strin
           <Text style={styles.whoSub}>{n > 0 ? '±15 минут от вашего снимка' : '±15 минут больше никто не снимал'}</Text>
         </View>
       </View>
-      <Pressable onPress={n > 0 ? seeThem : toMap} style={({ pressed }) => [styles.button, { marginTop: 24, alignSelf: 'stretch' }, pressed && { opacity: 0.88 }]}>
-        <Text style={styles.buttonText}>{n > 0 ? 'Посмотреть их фото' : 'Вернуться на карту'}</Text>
-      </Pressable>
+      {/* оранжевая кнопка — только для просмотра чужих фото; если смотреть нечего, остаётся серая ссылка */}
       {n > 0 && (
-        <Pressable onPress={toMap} hitSlop={10} style={{ marginTop: 20 }}>
-          <Text style={styles.backText}>Вернуться на карту</Text>
+        <Pressable onPress={seeThem} style={({ pressed }) => [styles.button, { marginTop: 24, alignSelf: 'stretch' }, pressed && { opacity: 0.88 }]}>
+          <Text style={styles.buttonText}>Посмотреть их фото</Text>
         </Pressable>
       )}
+      <Pressable onPress={toMap} hitSlop={10} style={{ marginTop: n > 0 ? 20 : 39 }}>
+        <Text style={styles.backText}>Вернуться на карту</Text>
+      </Pressable>
     </Animated.View>
   );
 }
