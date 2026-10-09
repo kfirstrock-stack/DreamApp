@@ -22,6 +22,11 @@ export function MomentStrip({ taken, times, onPress }: { taken: Date; times: num
   const at = (taken.getTime() - from.getTime()) / (to.getTime() - from.getTime());
 
   const heights = useMemo(() => {
+    // F5: рядом никого (в окне только сам снимок) — серые на нуле, отметка момента во всю высоту
+    const own = times.indexOf(taken.getTime());
+    const others = own >= 0 ? times.filter((_, i) => i !== own) : times;
+    const inRange = others.filter((t) => t >= from.getTime() && t < from.getTime() + step * BARS);
+    if (inRange.length === 0) return new Array(BARS).fill(3).map((h, i) => (Math.abs(i - Math.floor(at * BARS)) <= 1 ? MAX_H : h));
     const raw = new Array(BARS).fill(0);
     for (const t of times) {
       const i = Math.floor((t - from.getTime()) / step);
@@ -32,7 +37,7 @@ export function MomentStrip({ taken, times, onPress }: { taken: Date; times: num
     const smooth = raw.map((_, i) => k.reduce((s, w, j) => s + w * (raw[i + j - 2] ?? 0), 0));
     const max = Math.max(1, ...smooth);
     return smooth.map((v) => Math.round(3 + (v / max) * (MAX_H - 3)));
-  }, [times, from.getTime(), step]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [times, from.getTime(), step, taken.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const me = Math.floor(at * BARS);
   return (
