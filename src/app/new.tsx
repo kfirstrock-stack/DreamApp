@@ -148,14 +148,14 @@ function Source() {
           <Icon name="camera" size={30} color={D.white} />
           <View style={styles.tileText}>
             <Text style={[styles.tileTitle, { color: D.white }]}>Снять сейчас</Text>
-            <Text style={[styles.tileSub, { color: 'rgba(255,255,255,0.8)' }]}>место и время — сразу</Text>
+            <Text style={[styles.tileSub, { color: 'rgba(255,255,255,0.8)' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>место и время — сразу</Text>
           </View>
         </Pressable>
         <Pressable onPress={() => pick('gallery')} style={({ pressed }) => [styles.tile, { backgroundColor: D.paper }, pressed && { opacity: 0.9 }]}>
           <Icon name="gallery" size={30} color={D.ink} />
           <View style={styles.tileText}>
             <Text style={styles.tileTitle}>Из галереи</Text>
-            <Text style={styles.tileSub}>возьмём их из снимка</Text>
+            <Text style={styles.tileSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>возьмём их из снимка</Text>
           </View>
         </Pressable>
       </View>
