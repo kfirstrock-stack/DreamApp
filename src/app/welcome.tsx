@@ -36,8 +36,12 @@ const LAST = 2;
 // Кнопка «дальше»: медленный старт, быстрая середина, мягкая остановка
 const EASE = Easing.bezier(0.76, 0, 0.24, 1);
 const SPRING = { damping: 20, stiffness: 120, mass: 1 };
-// Растяжение кнопки: сначала неспешно, к концу быстрее и мягкая посадка
-const EASE_W = Easing.bezierFn(0.5, 0, 0.2, 1);
+// Растяжение кнопки: плавный разгон и мягкая посадка (ease-in-out cubic). Своя функция-ворклет:
+// обычную JS-функцию на UI-потоке вызвать нельзя — анимация из-за этого вставала.
+function easeW(t: number) {
+  'worklet';
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
 
 type P = SharedValue<number>;
 
@@ -165,7 +169,7 @@ function Bottom({ progress, onNext }: { progress: P; onNext: () => void }) {
   };
   const dots = useAnimatedStyle(() => ({ opacity: interpolate(progress.value, [1, 1.35], [1, 0], Extrapolation.CLAMP) }));
   const btn = useAnimatedStyle(() => {
-    const k = EASE_W(t());
+    const k = easeW(t());
     const h = 60 - 6 * k;
     return {
       width: 60 + (width - 64 - 60) * k,
