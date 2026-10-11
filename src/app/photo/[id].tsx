@@ -521,13 +521,20 @@ export default function PhotoScreen() {
                 </Svg>
               </Pressable>
               <View style={styles.authorRow}>
-                {photo.author_avatar ? <Image source={{ uri: photo.author_avatar }} style={styles.avatar} /> : <View style={[styles.avatar, { backgroundColor: D.sun }]} />}
-                <View style={{ flex: 1, gap: 3 }}>
-                  <Text style={styles.author} numberOfLines={1}>{photo.author_name || photo.author_username || 'Путешественник'}</Text>
-                  <Text style={styles.sub} numberOfLines={1}>
-                    снял в {pad(taken.getHours())}:{pad(taken.getMinutes())} · {ago(taken)}
-                  </Text>
-                </View>
+                {/* автор → D3 (свой — D1) */}
+                <Pressable
+                  onPress={() => router.push(mine ? '/profile' : { pathname: '/user/[id]', params: { id: photo.user_id } })}
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                  accessibilityLabel="Профиль автора"
+                >
+                  {photo.author_avatar ? <Image source={{ uri: photo.author_avatar }} style={styles.avatar} /> : <View style={[styles.avatar, { backgroundColor: D.sun }]} />}
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={styles.author} numberOfLines={1}>{photo.author_name || photo.author_username || 'Путешественник'}</Text>
+                    <Text style={styles.sub} numberOfLines={1}>
+                      снял в {pad(taken.getHours())}:{pad(taken.getMinutes())} · {ago(taken)}
+                    </Text>
+                  </View>
+                </Pressable>
                 <Pressable onPress={() => toggleLike()} hitSlop={10} style={styles.like} accessibilityLabel={photo.liked_by_me ? 'Убрать лайк' : 'Лайк'}>
                   <Animated.View style={heartStyle}>
                     <Icon name={photo.liked_by_me ? 'heartFill' : 'heart'} size={20} color={photo.liked_by_me ? D.sun : D.paper} />

@@ -1,5 +1,7 @@
 // Сгенерировано из Figma (страница «MVP — user flows», слои icon/*): сетка 24×24
 export const FIGMA_ICONS: Record<string, [number, number, number, string][]> = {
+ "settings": [[0, 0, 1.8, "M 19.04 10.50 L 21.51 10.66 L 21.51 13.34 L 19.04 13.50 L 18.04 15.92 L 19.67 17.78 L 17.78 19.67 L 15.92 18.04 L 13.50 19.04 L 13.34 21.51 L 10.66 21.51 L 10.50 19.04 L 8.08 18.04 L 6.22 19.67 L 4.33 17.78 L 5.96 15.92 L 4.96 13.50 L 2.49 13.34 L 2.49 10.66 L 4.96 10.50 L 5.96 8.08 L 4.33 6.22 L 6.22 4.33 L 8.08 5.96 L 10.50 4.96 L 10.66 2.49 L 13.34 2.49 L 13.50 4.96 L 15.92 5.96 L 17.78 4.33 L 19.67 6.22 L 18.04 8.08 Z"], [0, 0, 1.8, "M 15 12 C 15 13.66 13.66 15 12 15 C 10.34 15 9 13.66 9 12 C 9 10.34 10.34 9 12 9 C 13.66 9 15 10.34 15 12 Z"]],
+ "alert": [[3, 3, 2, "M 18 9 C 18 13.97 13.97 18 9 18 C 4.03 18 0 13.97 0 9 C 0 4.03 4.03 0 9 0 C 13.97 0 18 4.03 18 9 Z"], [12, 8, 2, "M 0 0 L 0 5 M 0 8 L 0.01 8"]],
  "lock": [[4, 11, 1.8, "M 2 0 L 14 0 C 15.1 0 16 0.9 16 2 L 16 8 C 16 9.1 15.1 10 14 10 L 2 10 C 0.9 10 0 9.1 0 8 L 0 2 C 0 0.9 0.9 0 2 0 Z"], [8, 3, 1.8, "M 0 8 L 0 4 C 0 1.79 1.79 0 4 0 C 6.21 0 8 1.79 8 4 L 8 8"]],
  "sparkle": [[5, 3, 2, "M 7 0 L 8.8 5.2 L 14 7 L 8.8 8.8 L 7 14 L 5.2 8.8 L 0 7 L 5.2 5.2 Z"]],
  "pin": [
@@ -338,4 +340,4 @@ export const FIGMA_ICONS: Record<string, [number, number, number, string][]> = {
  ]
 };
 
-export const ICON_ALIAS: Record<string, string> = {"back": "back", "chevL": "chevL", "chevR": "chevR", "chevD": "chevDown", "close": "close", "search": "search", "layers": "layers", "locate": "locate", "map": "map", "grid": "grid", "plus": "plus", "person": "user", "camera": "camera", "gallery": "image", "heart": "heart", "heartFill": "heart", "share": "share", "more": "more", "flag": "flag", "eyeOff": "eyeOff", "trash": "trash", "check": "check", "mail": "mail", "clock": "clock", "pin": "pin", "arrow": "arrow", "calendar": "calendar", "sparkle": "sparkle", "lock": "lock"};
+export const ICON_ALIAS: Record<string, string> = {"back": "back", "chevL": "chevL", "chevR": "chevR", "chevD": "chevDown", "close": "close", "search": "search", "layers": "layers", "locate": "locate", "map": "map", "grid": "grid", "plus": "plus", "person": "user", "camera": "camera", "gallery": "image", "heart": "heart", "heartFill": "heart", "share": "share", "more": "more", "flag": "flag", "eyeOff": "eyeOff", "trash": "trash", "check": "check", "mail": "mail", "clock": "clock", "pin": "pin", "arrow": "arrow", "calendar": "calendar", "sparkle": "sparkle", "lock": "lock", "settings": "settings", "alert": "alert"};

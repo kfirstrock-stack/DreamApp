@@ -1,20 +1,15 @@
 // A6 · Создание профиля (только новые пользователи): имя обязательно, ник уникальный, фото — по желанию
 import { Image } from 'expo-image';
-import * as ImageManipulator from 'expo-image-manipulator';
-import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { decode } from 'base64-arraybuffer';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
-import { scheduleOnRN } from 'react-native-worklets';
 import { Icon } from '@/components/Icon';
 import { useAuth } from '@/lib/auth';
-import { D, F, SHEET_SPRING } from '@/lib/design';
+import { D, F } from '@/lib/design';
+import { PhotoSource } from '@/components/profile/PhotoSource';
+import { pickAvatarImage, uploadAvatar } from '@/lib/avatar';
 import { leaveAuth } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
 
@@ -54,34 +49,8 @@ export default function ProfileSetup() {
   const [sourceOpen, setSourceOpen] = useState(false);
   const pickAvatar = async (src: 'camera' | 'gallery') => {
     setSourceOpen(false);
-    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 };
-    let res: ImagePicker.ImagePickerResult;
-    if (src === 'camera') {
-      // доступ к камере спрашиваем только сейчас — при первой съёмке (как обещает A7)
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        return Alert.alert('Нет доступа к камере', 'Разрешите DreamApp пользоваться камерой в настройках — или выберите фото из галереи.', [
-          { text: 'Отмена', style: 'cancel' },
-          { text: 'Открыть настройки', onPress: () => Linking.openSettings() },
-        ]);
-      }
-      // Без системного кадрирования: iOS показывает селфи зеркально, а кадрирует уже «настоящий» снимок —
-      // лицо при этом переворачивается. Отражаем снимок как в видоискателе и сами берём квадрат по центру.
-      res = await ImagePicker.launchCameraAsync({ ...opts, allowsEditing: false, cameraType: ImagePicker.CameraType.front });
-    } else {
-      res = await ImagePicker.launchImageLibraryAsync(opts);
-    }
-    if (res.canceled || !res.assets?.[0]) return;
-    const a = res.assets[0];
-    const ctx = ImageManipulator.ImageManipulator.manipulate(a.uri);
-    if (src === 'camera') {
-      ctx.flip(ImageManipulator.FlipType.Horizontal);
-      const side = Math.min(a.width, a.height);
-      if (side > 0) ctx.crop({ originX: (a.width - side) / 2, originY: (a.height - side) / 2, width: side, height: side });
-    }
-    ctx.resize({ width: 400, height: null });
-    const img = await (await ctx.renderAsync()).saveAsync({ format: ImageManipulator.SaveFormat.JPEG, compress: 0.8, base64: true });
-    setAvatar({ uri: img.uri, base64: img.base64 ?? '' });
+    const img = await pickAvatarImage(src);
+    if (img) setAvatar(img);
   };
 
   const ready = name.trim().length > 0 && nickState === 'free' && !busy;
@@ -91,11 +60,7 @@ export default function ProfileSetup() {
     try {
       let avatar_url = profile?.avatar_url ?? null;
       if (avatar?.base64) {
-        const path = `${session.user.id}/avatar-${Date.now()}.jpg`;
-        // без upsert: имя и так уникальное, а upsert требует ещё прав SELECT/UPDATE в хранилище (из-за этого падало)
-        const up = await supabase.storage.from('photos').upload(path, decode(avatar.base64), { contentType: 'image/jpeg' });
-        if (up.error) throw up.error;
-        avatar_url = supabase.storage.from('photos').getPublicUrl(path).data.publicUrl;
+        avatar_url = await uploadAvatar(session.user.id, avatar.base64);
       }
       const { error } = await supabase
         .from('profiles')
@@ -182,58 +147,6 @@ export default function ProfileSetup() {
   );
 }
 
-/** A6 · шторка «Фото профиля» — как C2: «Снять» и «Из галереи». Закрыть — смахнуть вниз или тап по затемнению */
-function PhotoSource({ onPick, onClose }: { onPick: (src: 'camera' | 'gallery') => void; onClose: () => void }) {
-  const insets = useSafeAreaInsets();
-  const drag = useSharedValue(0);
-  const spring = SlideInDown.springify().damping(SHEET_SPRING.damping).stiffness(SHEET_SPRING.stiffness).mass(SHEET_SPRING.mass);
-  const pan = Gesture.Pan()
-    .activeOffsetY(8)
-    .onUpdate((e) => {
-      drag.value = Math.max(0, e.translationY);
-    })
-    .onEnd((e) => {
-      if (e.translationY > 80 || e.velocityY > 800) scheduleOnRN(onClose);
-      else drag.value = withSpring(0, SHEET_SPRING);
-    });
-  const st = useAnimatedStyle(() => ({ transform: [{ translateY: drag.value }] }));
-  return (
-    <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(160)} style={styles.dim}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Закрыть" />
-      <GestureDetector gesture={pan}>
-        <Animated.View entering={spring} exiting={SlideOutDown.duration(200)} style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 10 }, st]}>
-          <Pressable onPress={onClose} style={styles.grip} hitSlop={{ top: 10, bottom: 6, left: 30, right: 30 }} accessibilityLabel="Закрыть">
-            <Svg width={25} height={8}>
-              <Path d="M 1.5 1.5 C 8.5 5 16.5 5 23.5 1.5" stroke="rgba(22,19,15,0.28)" strokeWidth={2} strokeLinecap="round" fill="none" />
-            </Svg>
-          </Pressable>
-          <Text style={styles.sheetTitle}>Фото профиля</Text>
-          <View style={styles.tiles}>
-            <Pressable onPress={() => onPick('camera')} style={({ pressed }) => [styles.tile, { backgroundColor: D.sun }, pressed && { opacity: 0.9 }]}>
-              <Icon name="camera" size={30} color={D.white} />
-              <View style={styles.tileText}>
-                <Text style={[styles.tileTitle, { color: D.white }]}>Снять</Text>
-                <Text style={[styles.tileSub, { color: 'rgba(255,255,255,0.8)' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                  на фронтальную камеру
-                </Text>
-              </View>
-            </Pressable>
-            <Pressable onPress={() => onPick('gallery')} style={({ pressed }) => [styles.tile, { backgroundColor: D.paper }, pressed && { opacity: 0.9 }]}>
-              <Icon name="gallery" size={30} color={D.ink} />
-              <View style={styles.tileText}>
-                <Text style={styles.tileTitle}>Из галереи</Text>
-                <Text style={styles.tileSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                  выберите снимок
-                </Text>
-              </View>
-            </Pressable>
-          </View>
-        </Animated.View>
-      </GestureDetector>
-    </Animated.View>
-  );
-}
-
 const styles = StyleSheet.create({
   round: {
     width: 44,
@@ -282,23 +195,4 @@ const styles = StyleSheet.create({
   hint: { marginTop: 8, fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: D.ink60 },
   button: { backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
-  // шторка «Фото профиля» — те же размеры, что C2
-  dim: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(15,14,12,0.45)', justifyContent: 'flex-end', zIndex: 10 },
-  sheet: {
-    backgroundColor: D.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    shadowColor: '#17120D',
-    shadowOpacity: 0.14,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: -6 },
-  },
-  grip: { alignSelf: 'center', height: 26, paddingTop: 9 },
-  sheetTitle: { fontFamily: F.serifItalic, fontSize: 30, lineHeight: 40, color: D.ink },
-  tiles: { flexDirection: 'row', gap: 13, marginTop: 16 },
-  tile: { flex: 1, height: 140, borderRadius: 22, padding: 18, justifyContent: 'space-between' },
-  tileText: { gap: 4 },
-  tileTitle: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.ink },
-  tileSub: { fontFamily: F.sans, fontSize: 12, lineHeight: 16, color: D.ink60 },
 });

@@ -40,6 +40,8 @@ const ICONS = {
   arrow: { ios: 'arrow.right', android: 'arrow_forward' },
   sparkle: { ios: 'sparkle', android: 'auto_awesome' },
   lock: { ios: 'lock', android: 'lock' },
+  settings: { ios: 'gearshape', android: 'settings' },
+  alert: { ios: 'exclamationmark.circle', android: 'error' },
 } as const;
 
 export type IconName = keyof typeof ICONS;
