@@ -36,6 +36,8 @@ const LAST = 2;
 // Кнопка «дальше»: медленный старт, быстрая середина, мягкая остановка
 const EASE = Easing.bezier(0.76, 0, 0.24, 1);
 const SPRING = { damping: 20, stiffness: 120, mass: 1 };
+// Растяжение кнопки: сначала неспешно, к концу быстрее и мягкая посадка
+const EASE_W = Easing.bezierFn(0.5, 0, 0.2, 1);
 
 type P = SharedValue<number>;
 
@@ -120,10 +122,10 @@ export default function Welcome() {
         <StatusBar style={page === 0 ? 'light' : 'dark'} />
         {/* A1 — верхний слой: тёмная «шторка» уезжает и открывает бумагу A2 под собой */}
         <A2 progress={progress} width={width} />
-        <A3 progress={progress} width={width} active={page === LAST} onStart={toSignIn} />
+        <A3 progress={progress} width={width} />
         <A1 progress={progress} width={width} />
         <Skip progress={progress} active={page < LAST} onPress={toSignIn} />
-        <Bottom progress={progress} active={page < LAST} onNext={next} />
+        <Bottom progress={progress} onNext={next} />
       </Animated.View>
     </GestureDetector>
   );
@@ -153,24 +155,61 @@ function Dot({ progress, k }: { progress: P; k: number }) {
   return <Animated.View style={[styles.dot, st]} />;
 }
 
-function Bottom({ progress, active, onNext }: { progress: P; active: boolean; onNext: () => void }) {
+function Bottom({ progress, onNext }: { progress: P; onNext: () => void }) {
   const insets = useSafeAreaInsets();
-  // На A3 ряд с точками и стрелкой уступает место кнопке «Начать»
-  const st = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [1, 1.5], [1, 0], Extrapolation.CLAMP),
-    transform: [{ translateY: interpolate(progress.value, [1, 1.5], [0, 16], Extrapolation.CLAMP) }],
-  }));
+  const { width } = useWindowDimensions();
+  // Круглая стрелка на пути к A3 вытягивается влево в длинную кнопку «Начать» (как в макете A3)
+  const t = () => {
+    'worklet';
+    return interpolate(progress.value, [1, 2], [0, 1], Extrapolation.CLAMP);
+  };
+  const dots = useAnimatedStyle(() => ({ opacity: interpolate(progress.value, [1, 1.35], [1, 0], Extrapolation.CLAMP) }));
+  const btn = useAnimatedStyle(() => {
+    const k = EASE_W(t());
+    const h = 60 - 6 * k;
+    return {
+      width: 60 + (width - 64 - 60) * k,
+      height: h,
+      borderRadius: h / 2,
+      bottom: insets.bottom - 4 + 6 * k,
+    };
+  });
+  const arrow = useAnimatedStyle(() => {
+    const v = t();
+    return {
+      opacity: interpolate(v, [0, 0.35], [1, 0], Extrapolation.CLAMP),
+      transform: [{ translateX: interpolate(v, [0, 0.35], [0, 14], Extrapolation.CLAMP) }],
+    };
+  });
+  const label = useAnimatedStyle(() => {
+    const v = t();
+    return {
+      opacity: interpolate(v, [0.55, 1], [0, 1], Extrapolation.CLAMP),
+      transform: [{ scale: interpolate(v, [0.55, 1], [0.92, 1], Extrapolation.CLAMP) }],
+    };
+  });
   return (
-    <Animated.View pointerEvents={active ? 'box-none' : 'none'} style={[styles.bottomRow, { bottom: insets.bottom - 4 }, st]}>
-      <View style={styles.dots}>
-        {[0, 1, 2].map((k) => (
-          <Dot key={k} progress={progress} k={k} />
-        ))}
-      </View>
-      <Pressable onPress={onNext} style={({ pressed }) => [styles.arrow, pressed && { opacity: 0.88 }]} accessibilityLabel="Дальше">
-        <Icon name="arrow" size={27.6} color={D.white} />
-      </Pressable>
-    </Animated.View>
+    <>
+      <Animated.View pointerEvents="none" style={[styles.dotsRow, { bottom: insets.bottom - 4 }, dots]}>
+        <View style={styles.dots}>
+          {[0, 1, 2].map((k) => (
+            <Dot key={k} progress={progress} k={k} />
+          ))}
+        </View>
+      </Animated.View>
+      <Animated.View style={[styles.morph, btn]}>
+        <Pressable onPress={onNext} style={({ pressed }) => [styles.morphPress, pressed && { opacity: 0.88 }]} accessibilityRole="button">
+          <Animated.View style={[styles.morphCenter, arrow]}>
+            <Icon name="arrow" size={27.6} color={D.white} />
+          </Animated.View>
+          <Animated.View style={[styles.morphCenter, label]}>
+            <Text style={styles.buttonText} numberOfLines={1}>
+              Начать
+            </Text>
+          </Animated.View>
+        </Pressable>
+      </Animated.View>
+    </>
   );
 }
 
@@ -244,7 +283,7 @@ function A2({ progress, width }: { progress: P; width: number }) {
   );
 }
 
-function A3({ progress, width, active, onStart }: { progress: P; width: number; active: boolean; onStart: () => void }) {
+function A3({ progress, width }: { progress: P; width: number }) {
   const { at, s, insets, onText } = useArt(428, 42); // чип расстояния → «03 / 03»
   // Два снимка прилетают с разной скоростью и докручиваются до своего наклона; пунктир и чип проявляются последними
   const left = useLayer(progress, 2, width, { k: 0.7, fade: 0.9, rot: 10, lift: 20 });
@@ -256,10 +295,6 @@ function A3({ progress, width, active, onStart }: { progress: P; width: number; 
       transform: [{ scale: interpolate(a, [0, 0.35], [1, 0.85], Extrapolation.CLAMP) }],
     };
   });
-  const button = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [1.5, 2], [0, 1], Extrapolation.CLAMP),
-    transform: [{ translateY: interpolate(progress.value, [1.5, 2], [16, 0], Extrapolation.CLAMP) }],
-  }));
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <Animated.View pointerEvents="none" style={[at(14.56, 84.44, 249, 285.33), left]}>
@@ -285,11 +320,6 @@ function A3({ progress, width, active, onStart }: { progress: P; width: number; 
           <Text style={styles.privacyText}>Публикуется только то, что выберете вы</Text>
         </View>
       </TextBlock>
-      <Animated.View pointerEvents={active ? 'auto' : 'none'} style={[styles.buttonWrap, { bottom: insets.bottom + 2 }, button]}>
-        <Pressable onPress={onStart} style={({ pressed }) => [styles.button, pressed && { opacity: 0.88 }]}>
-          <Text style={styles.buttonText}>Начать</Text>
-        </Pressable>
-      </Animated.View>
     </View>
   );
 }
@@ -313,14 +343,14 @@ const styles = StyleSheet.create({
   body: { marginTop: 12, maxWidth: 320, fontFamily: F.sans, fontSize: 16, lineHeight: 23, color: 'rgba(22,19,15,0.62)' },
   privacy: { marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 10 },
   privacyText: { fontFamily: F.sans, fontSize: 14, color: D.ink60 },
-  bottomRow: { position: 'absolute', left: 32, right: 32, height: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  dotsRow: { position: 'absolute', left: 32, height: 60, justifyContent: 'center' },
+  morph: { position: 'absolute', right: 32, backgroundColor: D.sun, overflow: 'hidden' },
+  morphPress: { flex: 1 },
+  morphCenter: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   dots: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  arrow: { width: 60, height: 60, borderRadius: 30, backgroundColor: D.sun, alignItems: 'center', justifyContent: 'center' },
   chipWrap: { overflow: 'visible' },
   chip: { position: 'absolute', left: 0, top: 0, transformOrigin: 'left top', backgroundColor: D.sun, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   chipText: { fontFamily: F.mono, fontSize: 12, color: D.white },
-  buttonWrap: { position: 'absolute', left: 32, right: 32 },
-  button: { backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
 });
