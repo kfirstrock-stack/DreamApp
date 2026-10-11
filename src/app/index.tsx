@@ -226,14 +226,21 @@ export default function MapScreen() {
 
   // Первый запуск без входа — онбординг A1–A3 → вход A4 (один раз)
   const onboardChecked = useRef(false);
+  // Тёмная заглушка поверх карты, пока не решили, показывать ли онбординг: карта не мелькает перед A1
+  const [cover, setCover] = useState(true);
   useEffect(() => {
     if (!ready || onboardChecked.current) return;
     onboardChecked.current = true;
-    if (session) return hideSplash();
+    const open = () => {
+      hideSplash();
+      setCover(false);
+    };
+    if (session) return open();
     isOnboarded().then((done) => {
-      if (done) return hideSplash();
+      if (done) return open();
       router.push('/welcome');
       hideSplash(250); // даём A1 отрисоваться под заставкой
+      setTimeout(() => setCover(false), 1500); // карта под онбордингом — уже не видна
     });
   }, [ready, session]);
 
@@ -748,6 +755,7 @@ export default function MapScreen() {
           }}
         />
       )}
+      {cover && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: D.night, zIndex: 100 }]} />}
     </View>
   );
 }

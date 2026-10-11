@@ -1,14 +1,13 @@
 // A7 · Разрешения: объясняем до системного окна. «Позже» — приложение работает и без них. Дальше → карта (B1)
 import * as Location from 'expo-location';
 import { requestPermissionsAsync as requestPhotos, getPermissionsAsync as getPhotos } from 'expo-media-library';
-import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { D, F } from '@/lib/design';
-import { markOnboarded } from '@/lib/onboarding';
+import { leaveAuth, markOnboarded } from '@/lib/onboarding';
 
 type Perm = { granted: boolean; canAsk: boolean };
 
@@ -34,7 +33,7 @@ export default function Permissions() {
   };
   const done = async () => {
     await markOnboarded();
-    router.back();
+    leaveAuth();
   };
 
   return (

@@ -14,9 +14,8 @@ export default function ResetOnboarding() {
     }
     resetOnboarded().then(() => {
       if (router.canGoBack()) {
-        // приложение уже было открыто: карта под нами — сразу открываем A1
-        router.back();
-        router.push('/welcome');
+        // приложение уже было открыто: карта под нами — меняем этот экран на A1, карту не показываем
+        router.replace('/welcome');
       } else {
         // холодный запуск по ссылке: карта сама увидит сброс и откроет A1 (как при первом запуске)
         router.replace('/');

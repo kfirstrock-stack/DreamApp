@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 import { Icon } from '@/components/Icon';
 import { D, F } from '@/lib/design';
+import { setAuthFromWelcome } from '@/lib/onboarding';
 
 const ART = {
   a1: require('../../assets/onboarding/a1-photo.jpg'),
@@ -83,7 +84,10 @@ export default function Welcome() {
   // сдвигается с параллаксом, затем A4 без системной анимации — его снимки и текст влетают сами.
   const exit = useSharedValue(0);
   const leaving = useSharedValue(false);
-  const go = () => router.replace({ pathname: '/sign-in', params: { from: 'welcome' } });
+  const go = () => {
+    setAuthFromWelcome(true);
+    router.push({ pathname: '/sign-in', params: { from: 'welcome' } });
+  };
   const toSignIn = () => {
     if (leaving.value) return;
     leaving.value = true;

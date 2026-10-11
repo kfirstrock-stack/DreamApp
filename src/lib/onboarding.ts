@@ -1,5 +1,6 @@
 // Первый запуск (A1–A3 показываем один раз) и «куда вернуться после входа»
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 
 const KEY = 'dreamapp.onboarded';
@@ -28,4 +29,17 @@ export function hideSplash(delay = 0) {
 // Только для проверки в разработке: снова показать онбординг
 export async function resetOnboarded() {
   await AsyncStorage.removeItem(KEY).catch(() => {});
+}
+
+// Вход после онбординга открывается поверх A3 (без чёрного кадра между модалками),
+// поэтому выходить из него надо сразу на карту, а из C1 — просто назад к шторке публикации.
+let fromWelcome = false;
+export function setAuthFromWelcome(v: boolean) {
+  fromWelcome = v;
+}
+export function leaveAuth() {
+  if (fromWelcome) {
+    fromWelcome = false;
+    router.dismissTo('/');
+  } else router.back();
 }

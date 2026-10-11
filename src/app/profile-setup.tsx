@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useAuth } from '@/lib/auth';
 import { D, F } from '@/lib/design';
+import { leaveAuth } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
 
 type Nick = 'empty' | 'invalid' | 'checking' | 'free' | 'taken';
@@ -96,7 +97,7 @@ export default function ProfileSetup() {
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: D.paper }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 9, paddingHorizontal: 32 }} keyboardShouldPersistTaps="handled">
-        <Pressable onPress={() => router.back()} style={[styles.round, { marginLeft: -16 }]} accessibilityLabel="Назад">
+        <Pressable onPress={leaveAuth} style={[styles.round, { marginLeft: -16 }]} accessibilityLabel="Назад">
           <Icon name="back" size={20} color={D.ink} />
         </Pressable>
         <Text style={styles.step}>ПОСЛЕДНИЙ ШАГ</Text>

@@ -8,7 +8,7 @@ import Animated, { Easing, Extrapolation, interpolate, type SharedValue, useAnim
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { D, F } from '@/lib/design';
-import { markOnboarded } from '@/lib/onboarding';
+import { leaveAuth, markOnboarded } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
 
 const CODE = 8;
@@ -80,7 +80,7 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter }: { email: str
   const at = (x: number, y: number, w: number, h: number) => ({ position: 'absolute' as const, left: dx + x * s, top: insets.top + (y - 47) * s, width: w * s, height: h * s });
   const guest = async () => {
     await markOnboarded();
-    router.back();
+    leaveAuth();
   };
   return (
     <View style={styles.dark}>
@@ -170,7 +170,7 @@ function CodeStep({ email, onBack, onResend }: { email: string; onBack: () => vo
     setBusy(false);
     if (!p?.username) return router.replace('/profile-setup'); // A6 — только новые пользователи
     await markOnboarded();
-    router.back();
+    leaveAuth();
   };
 
   const change = (t: string) => {
