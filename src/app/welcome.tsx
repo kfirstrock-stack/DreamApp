@@ -36,12 +36,6 @@ const LAST = 2;
 // Кнопка «дальше»: медленный старт, быстрая середина, мягкая остановка
 const EASE = Easing.bezier(0.76, 0, 0.24, 1);
 const SPRING = { damping: 20, stiffness: 120, mass: 1 };
-// Растяжение кнопки: плавный разгон и мягкая посадка (ease-in-out cubic). Своя функция-ворклет:
-// обычную JS-функцию на UI-потоке вызвать нельзя — анимация из-за этого вставала.
-function easeW(t: number) {
-  'worklet';
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
 
 type P = SharedValue<number>;
 
@@ -163,13 +157,10 @@ function Bottom({ progress, onNext }: { progress: P; onNext: () => void }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   // Круглая стрелка на пути к A3 вытягивается влево в длинную кнопку «Начать» (как в макете A3)
-  const t = () => {
-    'worklet';
-    return interpolate(progress.value, [1, 2], [0, 1], Extrapolation.CLAMP);
-  };
   const dots = useAnimatedStyle(() => ({ opacity: interpolate(progress.value, [1, 1.35], [1, 0], Extrapolation.CLAMP) }));
   const btn = useAnimatedStyle(() => {
-    const k = easeW(t());
+    const v = Math.min(1, Math.max(0, progress.value - 1));
+    const k = v < 0.5 ? 4 * v * v * v : 1 - Math.pow(-2 * v + 2, 3) / 2; // плавный разгон и мягкая посадка
     const h = 60 - 6 * k;
     return {
       width: 60 + (width - 64 - 60) * k,
@@ -179,14 +170,14 @@ function Bottom({ progress, onNext }: { progress: P; onNext: () => void }) {
     };
   });
   const arrow = useAnimatedStyle(() => {
-    const v = t();
+    const v = Math.min(1, Math.max(0, progress.value - 1));
     return {
       opacity: interpolate(v, [0, 0.35], [1, 0], Extrapolation.CLAMP),
       transform: [{ translateX: interpolate(v, [0, 0.35], [0, 14], Extrapolation.CLAMP) }],
     };
   });
   const label = useAnimatedStyle(() => {
-    const v = t();
+    const v = Math.min(1, Math.max(0, progress.value - 1));
     return {
       opacity: interpolate(v, [0.55, 1], [0, 1], Extrapolation.CLAMP),
       transform: [{ scale: interpolate(v, [0.55, 1], [0.92, 1], Extrapolation.CLAMP) }],
