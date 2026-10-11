@@ -7,6 +7,7 @@ import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { RoundButton } from '@/components/ui/RoundButton';
+import { Stagger } from '@/components/ui/Stagger';
 import { useAuth } from '@/lib/auth';
 import { D, F } from '@/lib/design';
 import { forgetLastUser } from '@/lib/lastUser';
@@ -70,32 +71,40 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.body}>
+          <Stagger i={0}>
           <Text style={styles.label}>АККАУНТ</Text>
           <View style={styles.card}>
             <Row title="Почта" value={email} />
             <Sep />
             <Row title="Профиль" chevron onPress={() => router.push('/profile-edit')} />
           </View>
+          </Stagger>
 
+          <Stagger i={1}>
           <Text style={[styles.label, styles.next]}>ПРИВАТНОСТЬ</Text>
           <View style={styles.card}>
             <Row title="Участвовать в совпадениях" onPress={toggle} right={<Toggle on={matchesOn} />} role="switch" checked={matchesOn} />
             <Sep />
             <Row title="Скрытые авторы" value={hidden != null ? String(hidden) : ''} chevron onPress={() => router.push('/hidden')} />
           </View>
+          </Stagger>
 
+          <Stagger i={2}>
           <Text style={[styles.label, styles.next]}>О ПРИЛОЖЕНИИ</Text>
           <View style={styles.card}>
             <Row title="Правила сообщества" chevron onPress={() => router.push({ pathname: '/doc/[kind]', params: { kind: 'rules' } })} />
             <Sep />
             <Row title="Конфиденциальность" chevron onPress={() => router.push({ pathname: '/doc/[kind]', params: { kind: 'privacy' } })} />
           </View>
+          </Stagger>
 
+          <Stagger i={3}>
           <View style={[styles.card, { marginTop: 28 }]}>
             <Row title="Выйти" onPress={signOut} />
             <Sep />
             <Row title="Удалить аккаунт" danger onPress={() => setConfirm(true)} />
           </View>
+          </Stagger>
         </View>
         <View style={{ flex: 1, minHeight: 32 }} />
         <Text style={styles.version}>DreamApp {version} (MVP)</Text>

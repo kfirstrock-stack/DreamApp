@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoundButton } from '@/components/ui/RoundButton';
+import { Stagger } from '@/components/ui/Stagger';
 import { D, F } from '@/lib/design';
 import { DOCS, type DocKind } from '@/lib/docs';
 
@@ -19,7 +20,9 @@ export default function DocScreen() {
             {doc.title}
           </Text>
         </View>
-        <Text style={styles.body}>{doc.body}</Text>
+        <Stagger i={0}>
+          <Text style={styles.body}>{doc.body}</Text>
+        </Stagger>
       </ScrollView>
     </View>
   );

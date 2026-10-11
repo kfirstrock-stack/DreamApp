@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { PillButton } from '@/components/ui/PillButton';
 import { RoundButton } from '@/components/ui/RoundButton';
+import { Stagger } from '@/components/ui/Stagger';
 import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING } from '@/lib/design';
 import { hideAuthor, photoSource } from '@/lib/photos';
@@ -55,6 +56,7 @@ export default function UserScreen() {
           <RoundButton icon="more" label="Ещё" onPress={() => setMenu(true)} />
         </View>
 
+        <Stagger i={0}>
         <View style={styles.head}>
           {p?.avatar_url ? (
             <Image source={{ uri: p.avatar_url }} style={styles.avatar} contentFit="cover" />
@@ -71,12 +73,16 @@ export default function UserScreen() {
           </View>
         </View>
 
+        </Stagger>
+        <Stagger i={1}>
         <View style={styles.stats}>
           <Stat n={stats?.moments ?? 0} label={plural(stats?.moments ?? 0, 'момент', 'момента', 'моментов')} />
           <Stat n={stats?.likes ?? 0} label={plural(stats?.likes ?? 0, 'лайк', 'лайка', 'лайков')} />
           <Stat n={stats?.places ?? 0} label={plural(stats?.places ?? 0, 'место', 'места', 'мест')} />
         </View>
 
+        </Stagger>
+        <Stagger i={2}>
         {first && (
           <Pressable onPress={() => router.push({ pathname: '/match', params: { key: `${first.my_photo_id}:${first.other_photo_id}` } })} style={styles.common}>
             <Icon name="sparkle" size={18} color={D.sun} />
@@ -87,6 +93,8 @@ export default function UserScreen() {
           </Pressable>
         )}
 
+        </Stagger>
+        <Stagger i={3}>
         <View style={[styles.grid, { marginTop: first ? 20 : 21 }]}>
           {(photos ?? []).map((ph) => (
             <Pressable key={ph.id} onPress={() => router.push({ pathname: '/photo/[id]', params: { id: ph.id } })} style={[styles.photo, { width: tile, height: tile }]}>
@@ -100,6 +108,7 @@ export default function UserScreen() {
             </Pressable>
           ))}
         </View>
+        </Stagger>
       </ScrollView>
 
       {menu && (

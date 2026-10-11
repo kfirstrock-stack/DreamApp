@@ -6,6 +6,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoundButton } from '@/components/ui/RoundButton';
+import { Stagger } from '@/components/ui/Stagger';
 import { useAuth } from '@/lib/auth';
 import { D, F } from '@/lib/design';
 import { fetchHiddenAuthors, unhideAuthor, type HiddenAuthor } from '@/lib/profileData';
@@ -38,9 +39,12 @@ export default function HiddenAuthors() {
             Скрытые авторы
           </Text>
         </View>
+        <Stagger i={0}>
         <Text style={styles.intro}>
           {list && list.length === 0 ? 'Вы никого не скрывали.' : 'Их фото не появляются у вас на карте и в совпадениях.'}
         </Text>
+        </Stagger>
+        <Stagger i={1}>
         {list && list.length > 0 && (
           <View style={styles.card}>
             {list.map((a, i) => (
@@ -68,6 +72,7 @@ export default function HiddenAuthors() {
             ))}
           </View>
         )}
+        </Stagger>
       </ScrollView>
     </View>
   );

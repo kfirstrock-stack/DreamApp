@@ -36,11 +36,9 @@ export default function RootLayout() {
       <AuthProvider>
         <StatusBar style="dark" />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: D.paper }, orientation: 'portrait_up' }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="moment" />
+          {/* карта, профиль, раздел D, лента момента, поиск — свой JS-стек с переходами в стиле DreamApp */}
+          <Stack.Screen name="(main)" />
           <Stack.Screen name="photo/[id]" options={{ animation: 'fade', contentStyle: { backgroundColor: D.night }, orientation: 'all' }} />
-          <Stack.Screen name="profile" />
-          <Stack.Screen name="search" options={{ animation: 'fade', animationDuration: 200 }} />
           <Stack.Screen name="add" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="new" options={{ presentation: 'transparentModal', animation: 'none', contentStyle: { backgroundColor: 'transparent' } }} />
           <Stack.Screen
@@ -54,7 +52,6 @@ export default function RootLayout() {
           <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal', animation: 'none', gestureEnabled: false }} />
           <Stack.Screen name="profile-setup" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
           <Stack.Screen name="permissions" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
-          <Stack.Screen name="proto" />
           <Stack.Screen name="reset-onboarding" options={{ animation: 'none' }} />
           <Stack.Screen
             name="menu"

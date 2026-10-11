@@ -7,6 +7,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { RoundButton } from '@/components/ui/RoundButton';
+import { Stagger } from '@/components/ui/Stagger';
 import { TAB_BAR_SPACE, TabBar } from '@/components/ui/TabBar';
 import { useAuth } from '@/lib/auth';
 import { D, F } from '@/lib/design';
@@ -63,6 +64,7 @@ export default function ProfileScreen() {
           <RoundButton icon="settings" label="Настройки" onPress={() => router.push('/settings')} />
         </View>
 
+        <Stagger i={0}>
         <Pressable onPress={() => router.push('/profile-edit')} style={styles.head} accessibilityLabel="Редактировать профиль">
           {profile?.avatar_url ? (
             <Image source={{ uri: profile.avatar_url }} style={styles.avatar} contentFit="cover" />
@@ -78,13 +80,17 @@ export default function ProfileScreen() {
             <Text style={styles.since}>{since ? `В DREAMAPP С ${monthYearUpper(since)}` : ' '}</Text>
           </View>
         </Pressable>
+        </Stagger>
 
+        <Stagger i={1}>
         <View style={styles.stats}>
           <Stat n={stats?.moments ?? 0} label={plural(stats?.moments ?? 0, 'момент', 'момента', 'моментов')} />
           <Stat n={stats?.likes ?? 0} label={plural(stats?.likes ?? 0, 'лайк', 'лайка', 'лайков')} />
           <Stat n={matches?.length ?? 0} label={plural(matches?.length ?? 0, 'совпадение', 'совпадения', 'совпадений')} accent />
         </View>
+        </Stagger>
 
+        <Stagger i={2}>
         <Text style={[styles.label, { marginTop: 29 }]}>СОВПАДЕНИЯ</Text>
         {matches && matches.length > 0 ? (
           <ScrollView
@@ -105,7 +111,9 @@ export default function ProfileScreen() {
             <Text style={styles.emptyText}>Выкладывайте снимки — покажем, когда кто-то снимал там же и в то же время.</Text>
           </View>
         )}
+        </Stagger>
 
+        <Stagger i={3}>
         <View style={styles.momentsHead}>
           <Text style={styles.label}>МОИ МОМЕНТЫ</Text>
           {photos && photos.length > 0 && (
@@ -130,6 +138,7 @@ export default function ProfileScreen() {
             </Pressable>
           ))}
         </View>
+        </Stagger>
       </ScrollView>
 
       <View pointerEvents="none" style={styles.fade} />

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { PhotoSource } from '@/components/profile/PhotoSource';
 import { RoundButton } from '@/components/ui/RoundButton';
+import { Stagger } from '@/components/ui/Stagger';
 import { useAuth } from '@/lib/auth';
 import { NICK_RE, nickHint, pickAvatarImage, uploadAvatar, type NickState } from '@/lib/avatar';
 import { D, F } from '@/lib/design';
@@ -78,6 +79,7 @@ export default function ProfileEdit() {
           <Text style={styles.title}>Профиль</Text>
         </View>
 
+        <Stagger i={0}>
         <Pressable
           onPress={() => {
             Keyboard.dismiss();
@@ -101,6 +103,8 @@ export default function ProfileEdit() {
           <Text style={styles.change}>Изменить фото</Text>
         </Pressable>
 
+        </Stagger>
+        <Stagger i={1}>
         <View style={styles.fields}>
           <View style={styles.group}>
             <Text style={styles.label}>ИМЯ</Text>
@@ -154,10 +158,13 @@ export default function ProfileEdit() {
           </View>
         </View>
 
+        </Stagger>
         <View style={{ flex: 1, minHeight: 32 }} />
+        <Stagger i={2}>
         <Pressable onPress={save} disabled={!ready} style={[styles.button, { marginBottom: Math.max(insets.bottom, 16) + 16 }, !ready && { opacity: 0.45 }]}>
           {busy ? <ActivityIndicator color={D.white} /> : <Text style={styles.buttonText}>Сохранить</Text>}
         </Pressable>
+        </Stagger>
       </ScrollView>
       {sourceOpen && <PhotoSource onPick={pick} onClose={() => setSourceOpen(false)} />}
     </KeyboardAvoidingView>

@@ -6,6 +6,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensio
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Line } from 'react-native-svg';
 import { RoundButton } from '@/components/ui/RoundButton';
+import { Stagger } from '@/components/ui/Stagger';
 import { useAuth } from '@/lib/auth';
 import { D, F } from '@/lib/design';
 import { photoSource } from '@/lib/photos';
@@ -52,10 +53,13 @@ export default function MatchScreen() {
           <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
         </View>
         <View style={styles.body}>
+          <Stagger i={0}>
           <Text style={styles.kicker}>СОВПАДЕНИЕ</Text>
           <Text style={styles.title}>Вы могли попасть в кадр к {dative(who)}</Text>
 
+          </Stagger>
           {/* два снимка-полароида и расстояние между ними */}
+          <Stagger i={1}>
           <View style={{ height: 233 * s, marginTop: 10, marginHorizontal: -24 }}>
             <Polaroid source={photoSource(m.my_storage_path)} caption={`ВЫ · ${hm(mine)}`} cx={115.3} cy={105.5} rot={-5} s={s} w={width} />
             <Polaroid source={photoSource(m.other_storage_path)} caption={`${first.toUpperCase()} · ${hm(theirs)}`} cx={276.1} cy={113.3} rot={5} s={s} w={width} />
@@ -64,8 +68,12 @@ export default function MatchScreen() {
             </View>
           </View>
 
+          </Stagger>
+          <Stagger i={2}>
           <MiniMap m={m} who={first} label={`${(m.place_name ?? '').toUpperCase()}${m.place_name ? ' · ' : ''}${dayUpper(mine)}`} />
 
+          </Stagger>
+          <Stagger i={3}>
           <Pressable onPress={openAuthor} style={styles.author} accessibilityLabel={`Профиль: ${who}`}>
             {m.other_avatar ? (
               <Image source={{ uri: m.other_avatar }} style={styles.ava} />
@@ -97,6 +105,7 @@ export default function MatchScreen() {
           <Pressable onPress={hide} hitSlop={{ left: 16, right: 16 }} style={styles.hide}>
             <Text style={styles.hideText}>Это не я — скрыть</Text>
           </Pressable>
+          </Stagger>
         </View>
       </ScrollView>
     </View>
