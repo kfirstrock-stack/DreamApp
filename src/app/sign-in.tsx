@@ -43,7 +43,19 @@ export default function SignIn() {
   };
 
   if (step === 'code') return <CodeStep email={email.trim().toLowerCase()} onBack={() => setStep('email')} onResend={send} />;
-  return <EmailStep email={email} setEmail={setEmail} busy={busy} error={error} onSend={send} enter={enter} />;
+  return (
+    <EmailStep
+      email={email}
+      setEmail={(v) => {
+        setEmail(v);
+        setError(null); // подсказка об ошибке уходит, как только адрес правят
+      }}
+      busy={busy}
+      error={error}
+      onSend={send}
+      enter={enter}
+    />
+  );
 }
 
 /** A4 */
