@@ -114,17 +114,14 @@ export default function Welcome() {
       progress.value = withSpring(target, { ...SPRING, velocity: v });
     });
 
-  const bg = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(progress.value, [0, 1], [D.night, D.paper]),
-  }));
-
   return (
     <GestureDetector gesture={pan}>
-      <Animated.View style={[{ flex: 1 }, bg]}>
+      <Animated.View style={{ flex: 1, backgroundColor: D.paper }}>
         <StatusBar style={page === 0 ? 'light' : 'dark'} />
-        <A1 progress={progress} width={width} />
+        {/* A1 — верхний слой: тёмная «шторка» уезжает и открывает бумагу A2 под собой */}
         <A2 progress={progress} width={width} />
         <A3 progress={progress} width={width} active={page === LAST} onStart={toSignIn} />
+        <A1 progress={progress} width={width} />
         <Skip progress={progress} active={page < LAST} onPress={toSignIn} />
         <Bottom progress={progress} active={page < LAST} onNext={next} />
       </Animated.View>
@@ -199,19 +196,22 @@ function TextBlock({ progress, i, width, bottom, onLayout, children }: {
 
 function A1({ progress, width }: { progress: P; width: number }) {
   const insets = useSafeAreaInsets();
-  // Фото уходит медленнее пальца, чуть приближается и гаснет — под ним проступает бумага A2
+  // Шторка A1 уходит вместе с пальцем, а фото внутри — вдвое медленнее и чуть приближается (параллакс).
+  // Без полупрозрачности: тёмное и бумага не смешиваются в грязный серый.
+  const curtain = useAnimatedStyle(() => ({
+    transform: [{ translateX: -Math.max(0, progress.value) * width }],
+  }));
   const photo = useAnimatedStyle(() => {
-    const d = progress.value;
-    return {
-      opacity: interpolate(d, [0, 0.9], [1, 0], Extrapolation.CLAMP),
-      transform: [{ translateX: -d * width * 0.35 }, { scale: 1 + Math.abs(d) * 0.12 }],
-    };
+    const d = Math.max(0, progress.value);
+    return { transform: [{ translateX: d * width * 0.55 }, { scale: 1 + d * 0.12 }] };
   });
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Animated.View style={[StyleSheet.absoluteFill, photo]}>
-        <Image source={ART.a1} style={StyleSheet.absoluteFill} contentFit="cover" />
-        <View style={styles.shade} />
+      <Animated.View style={[StyleSheet.absoluteFill, styles.curtain, curtain]}>
+        <Animated.View style={[StyleSheet.absoluteFill, photo]}>
+          <Image source={ART.a1} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <View style={styles.shade} />
+        </Animated.View>
       </Animated.View>
       <TextBlock progress={progress} i={0} width={width} bottom={insets.bottom + 94}>
         <Text style={styles.step}>01 / 03</Text>
@@ -303,6 +303,7 @@ const styles = StyleSheet.create({
     height: '66%',
     experimental_backgroundImage: 'linear-gradient(180deg, rgba(15,14,12,0) 0%, #0F0E0C 100%)',
   },
+  curtain: { backgroundColor: D.night, overflow: 'hidden' },
   skip: { position: 'absolute', right: 24, zIndex: 5 },
   skipText: { fontFamily: F.sansMedium, fontSize: 15 },
   skipOver: { position: 'absolute', left: 0, top: 0 },
