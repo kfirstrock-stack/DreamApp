@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { saveLastUser } from './lastUser';
 import { supabase } from './supabase';
 import type { Profile } from './types';
 
@@ -43,6 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => sub.subscription.unsubscribe();
   }, [loadProfile]);
+
+  // запоминаем вошедшего (с готовым профилем) для экрана «С возвращением»
+  useEffect(() => {
+    const email = session?.user.email;
+    if (email && profile?.username) saveLastUser({ email, name: profile.display_name || profile.username, avatar: profile.avatar_url ?? null });
+  }, [session?.user.email, profile]);
 
   const refreshProfile = useCallback(() => loadProfile(session?.user.id), [loadProfile, session?.user.id]);
 

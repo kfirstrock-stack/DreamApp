@@ -8,6 +8,7 @@ import Animated, { Easing, Extrapolation, interpolate, type SharedValue, useAnim
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { D, F } from '@/lib/design';
+import { forgetLastUser, loadLastUser, type LastUser } from '@/lib/lastUser';
 import { leaveAuth, markOnboarded } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
 
@@ -30,6 +31,24 @@ export default function SignIn() {
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // уже входили на этом телефоне и вышли — A4 «С возвращением»
+  const [returning, setReturning] = useState<LastUser | null>(null);
+  const [known, setKnown] = useState(false); // пока не прочитали — тёмный фон, без мелькания обычного A4
+  useEffect(() => {
+    loadLastUser().then((u) => {
+      if (u) {
+        setReturning(u);
+        setEmail(u.email);
+      }
+      setKnown(true);
+    });
+  }, []);
+  const otherEmail = () => {
+    forgetLastUser();
+    setReturning(null);
+    setEmail('');
+    setError(null);
+  };
 
   const send = async () => {
     const e = email.trim().toLowerCase();
@@ -42,6 +61,7 @@ export default function SignIn() {
     setStep('code');
   };
 
+  if (!known) return <View style={styles.dark} />;
   if (step === 'code') return <CodeStep email={email.trim().toLowerCase()} onBack={() => setStep('email')} onResend={send} />;
   return (
     <EmailStep
@@ -54,6 +74,8 @@ export default function SignIn() {
       error={error}
       onSend={send}
       enter={enter}
+      returning={returning}
+      onOtherEmail={otherEmail}
     />
   );
 }
@@ -71,7 +93,10 @@ function useEnter(enter: SharedValue<number>, a: number, b: number, dx: number, 
   });
 }
 
-function EmailStep({ email, setEmail, busy, error, onSend, enter }: { email: string; setEmail: (s: string) => void; busy: boolean; error: string | null; onSend: () => void; enter: SharedValue<number> }) {
+function EmailStep({ email, setEmail, busy, error, onSend, enter, returning, onOtherEmail }: {
+  email: string; setEmail: (s: string) => void; busy: boolean; error: string | null; onSend: () => void; enter: SharedValue<number>;
+  returning: LastUser | null; onOtherEmail: () => void;
+}) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   // снимки — с разных сторон и с докруткой, центральный последним; текст — лесенкой справа, как в онбординге
@@ -164,17 +189,38 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter }: { email: str
         <View onLayout={(e) => !kbOpen.current && setTextTop(height - e.nativeEvent.layout.height)} style={{ paddingHorizontal: 32, paddingBottom: Math.max(insets.bottom - 3 - 13, 0) }}>
           <Animated.Text style={[styles.brand, t1]}>DreamApp</Animated.Text>
           <Animated.View style={[{ overflow: 'hidden' }, titleKb]}>
-            <View onLayout={(e) => (titleH.value = titleH.value || e.nativeEvent.layout.height)}>
-              <Animated.Text style={[styles.a4Title, t2]}>Каждое место помнит всех, кто там был</Animated.Text>
+            <View onLayout={(e) => (titleH.value = e.nativeEvent.layout.height)}>
+              <Animated.Text style={[styles.a4Title, t2]}>{returning ? `С возвращением, ${returning.name}` : 'Каждое место помнит всех, кто там был'}</Animated.Text>
             </View>
           </Animated.View>
           <Animated.View style={[{ overflow: 'hidden' }, bodyKb]}>
-            <View onLayout={(e) => (bodyH.value = bodyH.value || e.nativeEvent.layout.height)}>
-              <Animated.Text style={[styles.a4Body, t3]}>Выкладывайте снимки с местом и временем — и находите себя на чужих фото.</Animated.Text>
+            <View onLayout={(e) => (bodyH.value = e.nativeEvent.layout.height)}>
+              <Animated.Text style={[styles.a4Body, t3]}>
+                {returning
+                  ? Platform.OS === 'ios'
+                    ? 'Пришлём код на почту — iOS подставит его из письма сама.'
+                    : 'Пришлём код на почту — останется только ввести его.'
+                  : 'Выкладывайте снимки с местом и временем — и находите себя на чужих фото.'}
+              </Animated.Text>
             </View>
           </Animated.View>
           <View onLayout={(e) => (lowerH.current = e.nativeEvent.layout.height)}>
           <Animated.View style={t4}>
+          {returning ? (
+            // почта прошлого входа — не редактируется; сменить — «Другая почта»
+            <View style={styles.field}>
+              {returning.avatar ? (
+                <Image source={{ uri: returning.avatar }} style={styles.acctAva} />
+              ) : (
+                <View style={[styles.acctAva, styles.acctIni]}>
+                  <Text style={styles.acctIniText}>{returning.name.slice(0, 1).toUpperCase()}</Text>
+                </View>
+              )}
+              <Text style={styles.acctEmail} numberOfLines={1}>
+                {returning.email}
+              </Text>
+            </View>
+          ) : (
           <View style={styles.field}>
             <Icon name="mail" size={20} color={D.paper} />
             <TextInput
@@ -193,17 +239,36 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter }: { email: str
               style={styles.input}
             />
           </View>
+          )}
           {error ? <Text style={styles.error}>{error}</Text> : null}
           </Animated.View>
           <Animated.View style={t5}>
             <Pressable onPress={onSend} disabled={busy} style={({ pressed }) => [styles.button, { marginTop: 12 }, pressed && { opacity: 0.88 }]}>
-              {busy ? <ActivityIndicator color={D.white} /> : <Text style={styles.buttonText}>Получить код</Text>}
+              {busy ? (
+                <ActivityIndicator color={D.white} />
+              ) : (
+                <Text style={styles.buttonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                  {returning ? `Войти как ${returning.name}` : 'Получить код'}
+                </Text>
+              )}
             </Pressable>
             {/* G1 · гостевой вход (утверждено 09.10); «Продолжить с Apple» — в сборке для App Store */}
             {/* 32 pt от кнопки до ссылки и зона нажатия 45 pt, которая не заходит на кнопку — чтобы не промахнуться */}
-            <Pressable onPress={guest} hitSlop={{ left: 16, right: 16 }} style={{ alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13 }}>
-              <Text style={styles.guest}>Смотреть карту без входа</Text>
-            </Pressable>
+            {returning ? (
+              <View style={styles.links}>
+                <Pressable onPress={onOtherEmail} hitSlop={{ left: 12, right: 12 }} style={styles.linkHit}>
+                  <Text style={styles.guest}>Другая почта</Text>
+                </Pressable>
+                <Text style={[styles.guest, { opacity: 0.5 }]}>·</Text>
+                <Pressable onPress={guest} hitSlop={{ left: 12, right: 12 }} style={styles.linkHit}>
+                  <Text style={styles.guest}>Без входа</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable onPress={guest} hitSlop={{ left: 16, right: 16 }} style={{ alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13 }}>
+                <Text style={styles.guest}>Смотреть карту без входа</Text>
+              </Pressable>
+            )}
           </Animated.View>
           </View>
         </View>
@@ -353,6 +418,13 @@ const styles = StyleSheet.create({
   button: { backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
   guest: { fontFamily: F.sansSemi, fontSize: 15, color: 'rgba(244,239,230,0.7)' },
+  // A4 · с возвращением
+  acctAva: { width: 32, height: 32, borderRadius: 16, backgroundColor: D.night3, marginLeft: -4 },
+  acctIni: { backgroundColor: D.sun, alignItems: 'center', justifyContent: 'center' },
+  acctIniText: { fontFamily: F.sansSemi, fontSize: 14, color: D.white },
+  acctEmail: { flex: 1, fontFamily: F.sans, fontSize: 16, color: D.paper },
+  links: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 28, marginTop: 32 - 13 },
+  linkHit: { paddingVertical: 13 },
   backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(244,239,230,0.1)', alignItems: 'center', justifyContent: 'center' },
   a5Title: { marginTop: 24, fontFamily: F.serif, fontSize: 36, lineHeight: 48, color: D.paper },
   a5Sub: { marginTop: 6, maxWidth: 300, fontFamily: F.sans, fontSize: 16, lineHeight: 23, color: 'rgba(244,239,230,0.6)' },
