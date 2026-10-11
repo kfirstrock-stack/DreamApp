@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from '@/lib/auth';
 import { D } from '@/lib/design';
+import { hideSplash } from '@/lib/onboarding';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -22,9 +23,12 @@ export default function RootLayout() {
     JetBrainsMono_400Regular,
     JetBrainsMono_500Medium,
   });
+  // Заставку прячет главный экран, когда решит: карта или онбординг. Здесь — только страховка.
   useEffect(() => {
-    if (loaded || error) SplashScreen.hideAsync().catch(() => {});
-  }, [loaded, error]);
+    if (error) hideSplash();
+    const t = setTimeout(() => hideSplash(), 4000);
+    return () => clearTimeout(t);
+  }, [error]);
   if (!loaded && !error) return null;
 
   return (
@@ -40,7 +44,7 @@ export default function RootLayout() {
           <Stack.Screen name="add" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="new" options={{ presentation: 'transparentModal', animation: 'none', contentStyle: { backgroundColor: 'transparent' } }} />
           <Stack.Screen name="sign-in" options={{ presentation: 'fullScreenModal' }} />
-          <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />
+          <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal', animation: 'none', gestureEnabled: false }} />
           <Stack.Screen name="profile-setup" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
           <Stack.Screen name="permissions" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
           <Stack.Screen name="proto" />

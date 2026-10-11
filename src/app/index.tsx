@@ -23,7 +23,7 @@ import { TAB_BAR_SPACE, TabBar } from '@/components/ui/TabBar';
 import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING, STEP_MIN, softShadow } from '@/lib/design';
 import { consumeMapFocus } from '@/lib/focus';
-import { isOnboarded } from '@/lib/onboarding';
+import { hideSplash, isOnboarded } from '@/lib/onboarding';
 import { project, regionBounds, regionRadiusM, type MapRegion } from '@/lib/geo';
 import { fetchLatestIn, fetchPhotosV2 } from '@/lib/photos';
 import {
@@ -229,8 +229,12 @@ export default function MapScreen() {
   useEffect(() => {
     if (!ready || onboardChecked.current) return;
     onboardChecked.current = true;
-    if (session) return;
-    isOnboarded().then((done) => !done && router.push('/welcome'));
+    if (session) return hideSplash();
+    isOnboarded().then((done) => {
+      if (done) return hideSplash();
+      router.push('/welcome');
+      hideSplash(250); // даём A1 отрисоваться под заставкой
+    });
   }, [ready, session]);
 
   // При старте — к последнему моменту, где здесь есть фото: и карта, и шкала
