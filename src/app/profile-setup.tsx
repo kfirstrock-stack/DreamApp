@@ -92,7 +92,8 @@ export default function ProfileSetup() {
       let avatar_url = profile?.avatar_url ?? null;
       if (avatar?.base64) {
         const path = `${session.user.id}/avatar-${Date.now()}.jpg`;
-        const up = await supabase.storage.from('photos').upload(path, decode(avatar.base64), { contentType: 'image/jpeg', upsert: true });
+        // без upsert: имя и так уникальное, а upsert требует ещё прав SELECT/UPDATE в хранилище (из-за этого падало)
+        const up = await supabase.storage.from('photos').upload(path, decode(avatar.base64), { contentType: 'image/jpeg' });
         if (up.error) throw up.error;
         avatar_url = supabase.storage.from('photos').getPublicUrl(path).data.publicUrl;
       }
