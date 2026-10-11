@@ -41,5 +41,7 @@ export function leaveAuth() {
   if (fromWelcome) {
     fromWelcome = false;
     router.dismissTo('/');
-  } else router.back();
+  } else if (router.canGoBack()) router.back();
+  // открыли экран по ссылке или после перезагрузки — под ним ничего нет, идём на карту
+  else router.replace('/');
 }
