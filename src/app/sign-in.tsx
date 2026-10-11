@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import Animated, { Easing, Extrapolation, interpolate, type SharedValue, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -72,9 +72,37 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter }: { email: str
   const t3 = useEnter(enter, 0.32, 0.86, width * 0.4);
   const t4 = useEnter(enter, 0.38, 0.92, width * 0.46);
   const t5 = useEnter(enter, 0.44, 1, width * 0.5);
+  // Клавиатура (A4 · с клавиатурой, утверждено 11.10): снимки, заголовок и подпись гаснут и уходят,
+  // остаются «DreamApp», поле, кнопка и ссылка. Закрыли клавиатуру — всё возвращается.
+  const kb = useSharedValue(0);
+  const kbOpen = useRef(false);
+  const copyH = useSharedValue(0);
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', (e) => {
+      kbOpen.current = true;
+      kb.value = withTiming(1, { duration: e.duration || 250, easing: Easing.out(Easing.cubic) });
+    });
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', (e) => {
+      kbOpen.current = false;
+      kb.value = withTiming(0, { duration: e.duration || 250, easing: Easing.out(Easing.cubic) });
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [kb]);
+  const artKb = useAnimatedStyle(() => ({
+    opacity: 1 - kb.value,
+    transform: [{ translateY: -40 * kb.value }, { scale: 1 - 0.06 * kb.value }],
+  }));
+  const copyKb = useAnimatedStyle(() =>
+    copyH.value > 0
+      ? { height: copyH.value * (1 - kb.value), opacity: interpolate(kb.value, [0, 0.5], [1, 0], Extrapolation.CLAMP) }
+      : {},
+  );
   // на невысоких экранах полароиды уменьшаются, чтобы до «DreamApp» оставались 32 pt, как в макете
   const [textTop, setTextTop] = useState<number | null>(null);
-  const fit = textTop == null ? 1 : (textTop - 32 - insets.top) / (374 - 47);
+  const fit = textTop == null ? 1 : (textTop - 32 - insets.top) / (362 - 47);
   const s = Math.min(width / 393, height / 852, fit);
   const dx = (width - 393 * s) / 2;
   const at = (x: number, y: number, w: number, h: number) => ({ position: 'absolute' as const, left: dx + x * s, top: insets.top + (y - 47) * s, width: w * s, height: h * s });
@@ -85,26 +113,32 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter }: { email: str
   return (
     <View style={styles.dark}>
       <StatusBar style="light" />
-      <Animated.View style={[at(-1.68, 53.65, 276.33, 322.67), eLeft]}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, artKb]}>
+      <Animated.View style={[at(-1.68, 41.65, 276.33, 322.67), eLeft]}>
         <Image source={ART.left} style={StyleSheet.absoluteFill} contentFit="contain" />
       </Animated.View>
-      <Animated.View style={[at(178.9, 112.7, 225.67, 285.33), eRight]}>
+      <Animated.View style={[at(178.9, 100.7, 225.67, 285.33), eRight]}>
         <Image source={ART.right} style={StyleSheet.absoluteFill} contentFit="contain" />
       </Animated.View>
-      <Animated.View style={[at(65.1, 68.2, 274.67, 324.67), eCenter]}>
+      <Animated.View style={[at(65.1, 56.2, 274.67, 324.67), eCenter]}>
         <Image source={ART.center} style={StyleSheet.absoluteFill} contentFit="contain" />
       </Animated.View>
-      <Animated.View style={[at(176, 350, 0, 0), { overflow: 'visible' }, eTag]}>
+      <Animated.View style={[at(176, 338, 0, 0), { overflow: 'visible' }, eTag]}>
         <View style={[styles.placeTag, { transform: [{ scale: s }] }]}>
           <Icon name="pin" size={14} color={D.white} />
           <Text style={styles.placeTagText}>Исаакиевская пл.</Text>
         </View>
       </Animated.View>
+      </Animated.View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.bottom} keyboardVerticalOffset={-insets.bottom + 16}>
-        <View onLayout={(e) => setTextTop(height - e.nativeEvent.layout.height)} style={{ paddingHorizontal: 32, paddingBottom: Math.max(insets.bottom - 3 - 13, 0) }}>
+        <View onLayout={(e) => !kbOpen.current && setTextTop(height - e.nativeEvent.layout.height)} style={{ paddingHorizontal: 32, paddingBottom: Math.max(insets.bottom - 3 - 13, 0) }}>
           <Animated.Text style={[styles.brand, t1]}>DreamApp</Animated.Text>
-          <Animated.Text style={[styles.a4Title, t2]}>Каждое место помнит всех, кто там был</Animated.Text>
-          <Animated.Text style={[styles.a4Body, t3]}>Выкладывайте снимки с местом и временем — и находите себя на чужих фото.</Animated.Text>
+          <Animated.View style={[{ overflow: 'hidden' }, copyKb]}>
+            <View onLayout={(e) => (copyH.value = copyH.value || e.nativeEvent.layout.height)}>
+              <Animated.Text style={[styles.a4Title, t2]}>Каждое место помнит всех, кто там был</Animated.Text>
+              <Animated.Text style={[styles.a4Body, t3]}>Выкладывайте снимки с местом и временем — и находите себя на чужих фото.</Animated.Text>
+            </View>
+          </Animated.View>
           <Animated.View style={t4}>
           <View style={styles.field}>
             <Icon name="mail" size={20} color={D.paper} />
