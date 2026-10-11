@@ -101,7 +101,7 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter }: { email: str
         </View>
       </Animated.View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.bottom} keyboardVerticalOffset={-insets.bottom + 16}>
-        <View onLayout={(e) => setTextTop(height - e.nativeEvent.layout.height)} style={{ paddingHorizontal: 32, paddingBottom: Math.max(insets.bottom - 3, 12) }}>
+        <View onLayout={(e) => setTextTop(height - e.nativeEvent.layout.height)} style={{ paddingHorizontal: 32, paddingBottom: Math.max(insets.bottom - 3 - 13, 0) }}>
           <Animated.Text style={[styles.brand, t1]}>DreamApp</Animated.Text>
           <Animated.Text style={[styles.a4Title, t2]}>Каждое место помнит всех, кто там был</Animated.Text>
           <Animated.Text style={[styles.a4Body, t3]}>Выкладывайте снимки с местом и временем — и находите себя на чужих фото.</Animated.Text>
@@ -131,7 +131,8 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter }: { email: str
               {busy ? <ActivityIndicator color={D.white} /> : <Text style={styles.buttonText}>Получить код</Text>}
             </Pressable>
             {/* G1 · гостевой вход (утверждено 09.10); «Продолжить с Apple» — в сборке для App Store */}
-            <Pressable onPress={guest} hitSlop={10} style={{ alignSelf: 'center', marginTop: 20 }}>
+            {/* 32 pt от кнопки до ссылки и зона нажатия 45 pt, которая не заходит на кнопку — чтобы не промахнуться */}
+            <Pressable onPress={guest} hitSlop={{ left: 16, right: 16 }} style={{ alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13 }}>
               <Text style={styles.guest}>Смотреть карту без входа</Text>
             </Pressable>
           </Animated.View>
