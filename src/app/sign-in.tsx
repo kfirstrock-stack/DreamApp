@@ -76,29 +76,47 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter }: { email: str
   // остаются «DreamApp», поле, кнопка и ссылка. Закрыли клавиатуру — всё возвращается.
   const kb = useSharedValue(0);
   const kbOpen = useRef(false);
-  const copyH = useSharedValue(0);
+  // что из текста помещается над полем при открытой клавиатуре: 1 — оставить, 0 — убрать
+  const keepTitle = useSharedValue(1);
+  const keepBody = useSharedValue(1);
+  const titleH = useSharedValue(0);
+  const bodyH = useSharedValue(0);
+  const lowerH = useRef(0);
   useEffect(() => {
     const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', (e) => {
       kbOpen.current = true;
-      kb.value = withTiming(1, { duration: e.duration || 250, easing: Easing.out(Easing.cubic) });
+      const t = { duration: e.duration || 250, easing: Easing.out(Easing.cubic) };
+      // место над полем: от статус-бара до верха поля (поле, кнопка и ссылка стоят на клавиатуре)
+      const avail = height - e.endCoordinates.height - lowerH.current - insets.top - 16 - 32; // 32 — «DreamApp»
+      const tH = titleH.value;
+      const bH = bodyH.value;
+      const title = tH + bH <= avail || tH <= avail; // заголовок важнее подписи
+      const body = tH + bH <= avail || (!title && bH <= avail);
+      keepTitle.value = withTiming(title ? 1 : 0, t);
+      keepBody.value = withTiming(body ? 1 : 0, t);
+      kb.value = withTiming(1, t);
     });
     const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', (e) => {
       kbOpen.current = false;
-      kb.value = withTiming(0, { duration: e.duration || 250, easing: Easing.out(Easing.cubic) });
+      const t = { duration: e.duration || 250, easing: Easing.out(Easing.cubic) };
+      keepTitle.value = withTiming(1, t);
+      keepBody.value = withTiming(1, t);
+      kb.value = withTiming(0, t);
     });
     return () => {
       show.remove();
       hide.remove();
     };
-  }, [kb]);
+  }, [kb, keepTitle, keepBody, titleH, bodyH, height, insets.top]);
   const artKb = useAnimatedStyle(() => ({
     opacity: 1 - kb.value,
     transform: [{ translateY: -40 * kb.value }, { scale: 1 - 0.06 * kb.value }],
   }));
-  const copyKb = useAnimatedStyle(() =>
-    copyH.value > 0
-      ? { height: copyH.value * (1 - kb.value), opacity: interpolate(kb.value, [0, 0.5], [1, 0], Extrapolation.CLAMP) }
-      : {},
+  const titleKb = useAnimatedStyle(() =>
+    titleH.value > 0 ? { height: titleH.value * keepTitle.value, opacity: interpolate(keepTitle.value, [0.5, 1], [0, 1], Extrapolation.CLAMP) } : {},
+  );
+  const bodyKb = useAnimatedStyle(() =>
+    bodyH.value > 0 ? { height: bodyH.value * keepBody.value, opacity: interpolate(keepBody.value, [0.5, 1], [0, 1], Extrapolation.CLAMP) } : {},
   );
   // на невысоких экранах полароиды уменьшаются, чтобы до «DreamApp» оставались 32 pt, как в макете
   const [textTop, setTextTop] = useState<number | null>(null);
@@ -133,12 +151,17 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter }: { email: str
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.bottom} keyboardVerticalOffset={-insets.bottom + 16}>
         <View onLayout={(e) => !kbOpen.current && setTextTop(height - e.nativeEvent.layout.height)} style={{ paddingHorizontal: 32, paddingBottom: Math.max(insets.bottom - 3 - 13, 0) }}>
           <Animated.Text style={[styles.brand, t1]}>DreamApp</Animated.Text>
-          <Animated.View style={[{ overflow: 'hidden' }, copyKb]}>
-            <View onLayout={(e) => (copyH.value = copyH.value || e.nativeEvent.layout.height)}>
+          <Animated.View style={[{ overflow: 'hidden' }, titleKb]}>
+            <View onLayout={(e) => (titleH.value = titleH.value || e.nativeEvent.layout.height)}>
               <Animated.Text style={[styles.a4Title, t2]}>Каждое место помнит всех, кто там был</Animated.Text>
+            </View>
+          </Animated.View>
+          <Animated.View style={[{ overflow: 'hidden' }, bodyKb]}>
+            <View onLayout={(e) => (bodyH.value = bodyH.value || e.nativeEvent.layout.height)}>
               <Animated.Text style={[styles.a4Body, t3]}>Выкладывайте снимки с местом и временем — и находите себя на чужих фото.</Animated.Text>
             </View>
           </Animated.View>
+          <View onLayout={(e) => (lowerH.current = e.nativeEvent.layout.height)}>
           <Animated.View style={t4}>
           <View style={styles.field}>
             <Icon name="mail" size={20} color={D.paper} />
@@ -170,6 +193,7 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter }: { email: str
               <Text style={styles.guest}>Смотреть карту без входа</Text>
             </Pressable>
           </Animated.View>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </View>
