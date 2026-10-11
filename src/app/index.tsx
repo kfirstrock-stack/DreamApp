@@ -755,7 +755,7 @@ export default function MapScreen() {
           }}
         />
       )}
-      {cover && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: D.night, zIndex: 100 }]} />}
+      {cover && <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: D.night, zIndex: 9999, elevation: 99 }]} />}
     </View>
   );
 }
