@@ -65,12 +65,20 @@ export default function ProfileSetup() {
           { text: 'Открыть настройки', onPress: () => Linking.openSettings() },
         ]);
       }
-      res = await ImagePicker.launchCameraAsync({ ...opts, cameraType: ImagePicker.CameraType.front });
+      // Без системного кадрирования: iOS показывает селфи зеркально, а кадрирует уже «настоящий» снимок —
+      // лицо при этом переворачивается. Отражаем снимок как в видоискателе и сами берём квадрат по центру.
+      res = await ImagePicker.launchCameraAsync({ ...opts, allowsEditing: false, cameraType: ImagePicker.CameraType.front });
     } else {
       res = await ImagePicker.launchImageLibraryAsync(opts);
     }
     if (res.canceled || !res.assets?.[0]) return;
-    const ctx = ImageManipulator.ImageManipulator.manipulate(res.assets[0].uri);
+    const a = res.assets[0];
+    const ctx = ImageManipulator.ImageManipulator.manipulate(a.uri);
+    if (src === 'camera') {
+      ctx.flip(ImageManipulator.FlipType.Horizontal);
+      const side = Math.min(a.width, a.height);
+      if (side > 0) ctx.crop({ originX: (a.width - side) / 2, originY: (a.height - side) / 2, width: side, height: side });
+    }
     ctx.resize({ width: 400, height: null });
     const img = await (await ctx.renderAsync()).saveAsync({ format: ImageManipulator.SaveFormat.JPEG, compress: 0.8, base64: true });
     setAvatar({ uri: img.uri, base64: img.base64 ?? '' });
