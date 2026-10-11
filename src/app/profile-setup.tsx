@@ -5,12 +5,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { decode } from 'base64-arraybuffer';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
+import { scheduleOnRN } from 'react-native-worklets';
 import { Icon } from '@/components/Icon';
 import { useAuth } from '@/lib/auth';
-import { D, F } from '@/lib/design';
+import { D, F, SHEET_SPRING } from '@/lib/design';
 import { leaveAuth } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
 
@@ -46,8 +50,25 @@ export default function ProfileSetup() {
     return () => clearTimeout(t);
   }, [nick, session?.user.id]);
 
-  const pickAvatar = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 });
+  // Фото профиля: шторка «Снять» / «Из галереи» (утверждено 11.10)
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const pickAvatar = async (src: 'camera' | 'gallery') => {
+    setSourceOpen(false);
+    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 };
+    let res: ImagePicker.ImagePickerResult;
+    if (src === 'camera') {
+      // доступ к камере спрашиваем только сейчас — при первой съёмке (как обещает A7)
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        return Alert.alert('Нет доступа к камере', 'Разрешите DreamApp пользоваться камерой в настройках — или выберите фото из галереи.', [
+          { text: 'Отмена', style: 'cancel' },
+          { text: 'Открыть настройки', onPress: () => Linking.openSettings() },
+        ]);
+      }
+      res = await ImagePicker.launchCameraAsync({ ...opts, cameraType: ImagePicker.CameraType.front });
+    } else {
+      res = await ImagePicker.launchImageLibraryAsync(opts);
+    }
     if (res.canceled || !res.assets?.[0]) return;
     const ctx = ImageManipulator.ImageManipulator.manipulate(res.assets[0].uri);
     ctx.resize({ width: 400, height: null });
@@ -103,7 +124,7 @@ export default function ProfileSetup() {
         <Text style={styles.step}>ПОСЛЕДНИЙ ШАГ</Text>
         <Text style={styles.title}>Как вас зовут?</Text>
 
-        <Pressable onPress={pickAvatar} style={styles.avatarWrap} accessibilityLabel="Добавить фото">
+        <Pressable onPress={() => { Keyboard.dismiss(); setSourceOpen(true); }} style={styles.avatarWrap} accessibilityLabel={avatar ? 'Сменить фото' : 'Добавить фото'}>
           {avatar ? <Image source={{ uri: avatar.uri }} style={styles.avatarImg} /> : <View style={styles.avatar}><Icon name="camera" size={32} color={D.ink60} /></View>}
           <Text style={styles.addPhoto}>{avatar ? 'Сменить фото' : 'Добавить фото'}</Text>
         </Pressable>
@@ -147,7 +168,60 @@ export default function ProfileSetup() {
           {busy ? <ActivityIndicator color={D.white} /> : <Text style={styles.buttonText}>Готово</Text>}
         </Pressable>
       </ScrollView>
+      {sourceOpen && <PhotoSource onPick={pickAvatar} onClose={() => setSourceOpen(false)} />}
     </KeyboardAvoidingView>
+  );
+}
+
+/** A6 · шторка «Фото профиля» — как C2: «Снять» и «Из галереи». Закрыть — смахнуть вниз или тап по затемнению */
+function PhotoSource({ onPick, onClose }: { onPick: (src: 'camera' | 'gallery') => void; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  const drag = useSharedValue(0);
+  const spring = SlideInDown.springify().damping(SHEET_SPRING.damping).stiffness(SHEET_SPRING.stiffness).mass(SHEET_SPRING.mass);
+  const pan = Gesture.Pan()
+    .activeOffsetY(8)
+    .onUpdate((e) => {
+      drag.value = Math.max(0, e.translationY);
+    })
+    .onEnd((e) => {
+      if (e.translationY > 80 || e.velocityY > 800) scheduleOnRN(onClose);
+      else drag.value = withSpring(0, SHEET_SPRING);
+    });
+  const st = useAnimatedStyle(() => ({ transform: [{ translateY: drag.value }] }));
+  return (
+    <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(160)} style={styles.dim}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Закрыть" />
+      <GestureDetector gesture={pan}>
+        <Animated.View entering={spring} exiting={SlideOutDown.duration(200)} style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 10 }, st]}>
+          <Pressable onPress={onClose} style={styles.grip} hitSlop={{ top: 10, bottom: 6, left: 30, right: 30 }} accessibilityLabel="Закрыть">
+            <Svg width={25} height={8}>
+              <Path d="M 1.5 1.5 C 8.5 5 16.5 5 23.5 1.5" stroke="rgba(22,19,15,0.28)" strokeWidth={2} strokeLinecap="round" fill="none" />
+            </Svg>
+          </Pressable>
+          <Text style={styles.sheetTitle}>Фото профиля</Text>
+          <View style={styles.tiles}>
+            <Pressable onPress={() => onPick('camera')} style={({ pressed }) => [styles.tile, { backgroundColor: D.sun }, pressed && { opacity: 0.9 }]}>
+              <Icon name="camera" size={30} color={D.white} />
+              <View style={styles.tileText}>
+                <Text style={[styles.tileTitle, { color: D.white }]}>Снять</Text>
+                <Text style={[styles.tileSub, { color: 'rgba(255,255,255,0.8)' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  на фронтальную камеру
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable onPress={() => onPick('gallery')} style={({ pressed }) => [styles.tile, { backgroundColor: D.paper }, pressed && { opacity: 0.9 }]}>
+              <Icon name="gallery" size={30} color={D.ink} />
+              <View style={styles.tileText}>
+                <Text style={styles.tileTitle}>Из галереи</Text>
+                <Text style={styles.tileSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  выберите снимок
+                </Text>
+              </View>
+            </Pressable>
+          </View>
+        </Animated.View>
+      </GestureDetector>
+    </Animated.View>
   );
 }
 
@@ -199,4 +273,23 @@ const styles = StyleSheet.create({
   hint: { marginTop: 8, fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: D.ink60 },
   button: { backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
+  // шторка «Фото профиля» — те же размеры, что C2
+  dim: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(15,14,12,0.45)', justifyContent: 'flex-end', zIndex: 10 },
+  sheet: {
+    backgroundColor: D.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    shadowColor: '#17120D',
+    shadowOpacity: 0.14,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: -6 },
+  },
+  grip: { alignSelf: 'center', height: 26, paddingTop: 9 },
+  sheetTitle: { fontFamily: F.serifItalic, fontSize: 30, lineHeight: 40, color: D.ink },
+  tiles: { flexDirection: 'row', gap: 13, marginTop: 16 },
+  tile: { flex: 1, height: 140, borderRadius: 22, padding: 18, justifyContent: 'space-between' },
+  tileText: { gap: 4 },
+  tileTitle: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.ink },
+  tileSub: { fontFamily: F.sans, fontSize: 12, lineHeight: 16, color: D.ink60 },
 });
