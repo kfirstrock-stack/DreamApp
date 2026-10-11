@@ -1,9 +1,10 @@
 // A4 · Вход по почте и A5 · Ввод кода (8 цифр, Supabase OTP). Новый пользователь → A6, иначе — назад
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import Animated, { Easing, Extrapolation, interpolate, type SharedValue, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { D, F } from '@/lib/design';
@@ -19,6 +20,12 @@ const ART = {
 };
 
 export default function SignIn() {
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  // Появление A4 после онбординга: снимки и текст влетают (один раз — при возврате с A5 уже без него)
+  const enter = useSharedValue(from === 'welcome' ? 0 : 1);
+  useEffect(() => {
+    if (enter.value < 1) enter.value = withTiming(1, { duration: 1100, easing: Easing.bezier(0.22, 1, 0.36, 1) });
+  }, [enter]);
   const [email, setEmail] = useState('');
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [busy, setBusy] = useState(false);
@@ -36,13 +43,35 @@ export default function SignIn() {
   };
 
   if (step === 'code') return <CodeStep email={email.trim().toLowerCase()} onBack={() => setStep('email')} onResend={send} />;
-  return <EmailStep email={email} setEmail={setEmail} busy={busy} error={error} onSend={send} />;
+  return <EmailStep email={email} setEmail={setEmail} busy={busy} error={error} onSend={send} enter={enter} />;
 }
 
 /** A4 */
-function EmailStep({ email, setEmail, busy, error, onSend }: { email: string; setEmail: (s: string) => void; busy: boolean; error: string | null; onSend: () => void }) {
+// Слой появления: from — откуда влетает (dx, dy, поворот), [a, b] — когда в общей шкале 0..1
+function useEnter(enter: SharedValue<number>, a: number, b: number, dx: number, dy = 0, rot = 0, sc = 0) {
+  return useAnimatedStyle(() => {
+    const t = interpolate(enter.value, [a, b], [0, 1], Extrapolation.CLAMP);
+    const r = 1 - t;
+    return {
+      opacity: interpolate(t, [0, 0.4], [0, 1], Extrapolation.CLAMP),
+      transform: [{ translateX: dx * r }, { translateY: dy * r }, { rotate: `${rot * r}deg` }, { scale: 1 - sc * r }],
+    };
+  });
+}
+
+function EmailStep({ email, setEmail, busy, error, onSend, enter }: { email: string; setEmail: (s: string) => void; busy: boolean; error: string | null; onSend: () => void; enter: SharedValue<number> }) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  // снимки — с разных сторон и с докруткой, центральный последним; текст — лесенкой справа, как в онбординге
+  const eLeft = useEnter(enter, 0, 0.6, -width * 0.45, 30, -12);
+  const eRight = useEnter(enter, 0.05, 0.65, width * 0.45, 40, 12);
+  const eCenter = useEnter(enter, 0.12, 0.72, 0, 90, 6, 0.12);
+  const eTag = useEnter(enter, 0.45, 0.8, 0, 10, 0, 0.3);
+  const t1 = useEnter(enter, 0.22, 0.72, width * 0.25);
+  const t2 = useEnter(enter, 0.27, 0.8, width * 0.32);
+  const t3 = useEnter(enter, 0.32, 0.86, width * 0.4);
+  const t4 = useEnter(enter, 0.38, 0.92, width * 0.46);
+  const t5 = useEnter(enter, 0.44, 1, width * 0.5);
   // на невысоких экранах полароиды уменьшаются, чтобы до «DreamApp» оставались 32 pt, как в макете
   const [textTop, setTextTop] = useState<number | null>(null);
   const fit = textTop == null ? 1 : (textTop - 32 - insets.top) / (374 - 47);
@@ -56,20 +85,27 @@ function EmailStep({ email, setEmail, busy, error, onSend }: { email: string; se
   return (
     <View style={styles.dark}>
       <StatusBar style="light" />
-      <Image source={ART.left} style={at(-1.68, 53.65, 276.33, 322.67)} contentFit="contain" />
-      <Image source={ART.right} style={at(178.9, 112.7, 225.67, 285.33)} contentFit="contain" />
-      <Image source={ART.center} style={at(65.1, 68.2, 274.67, 324.67)} contentFit="contain" />
-      <View style={[at(176, 350, 0, 0), { overflow: 'visible' }]}>
+      <Animated.View style={[at(-1.68, 53.65, 276.33, 322.67), eLeft]}>
+        <Image source={ART.left} style={StyleSheet.absoluteFill} contentFit="contain" />
+      </Animated.View>
+      <Animated.View style={[at(178.9, 112.7, 225.67, 285.33), eRight]}>
+        <Image source={ART.right} style={StyleSheet.absoluteFill} contentFit="contain" />
+      </Animated.View>
+      <Animated.View style={[at(65.1, 68.2, 274.67, 324.67), eCenter]}>
+        <Image source={ART.center} style={StyleSheet.absoluteFill} contentFit="contain" />
+      </Animated.View>
+      <Animated.View style={[at(176, 350, 0, 0), { overflow: 'visible' }, eTag]}>
         <View style={[styles.placeTag, { transform: [{ scale: s }] }]}>
           <Icon name="pin" size={14} color={D.white} />
           <Text style={styles.placeTagText}>Исаакиевская пл.</Text>
         </View>
-      </View>
+      </Animated.View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.bottom} keyboardVerticalOffset={-insets.bottom + 16}>
         <View onLayout={(e) => setTextTop(height - e.nativeEvent.layout.height)} style={{ paddingHorizontal: 32, paddingBottom: Math.max(insets.bottom - 3, 12) }}>
-          <Text style={styles.brand}>DreamApp</Text>
-          <Text style={styles.a4Title}>Каждое место помнит всех, кто там был</Text>
-          <Text style={styles.a4Body}>Выкладывайте снимки с местом и временем — и находите себя на чужих фото.</Text>
+          <Animated.Text style={[styles.brand, t1]}>DreamApp</Animated.Text>
+          <Animated.Text style={[styles.a4Title, t2]}>Каждое место помнит всех, кто там был</Animated.Text>
+          <Animated.Text style={[styles.a4Body, t3]}>Выкладывайте снимки с местом и временем — и находите себя на чужих фото.</Animated.Text>
+          <Animated.View style={t4}>
           <View style={styles.field}>
             <Icon name="mail" size={20} color={D.paper} />
             <TextInput
@@ -89,13 +125,16 @@ function EmailStep({ email, setEmail, busy, error, onSend }: { email: string; se
             />
           </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Pressable onPress={onSend} disabled={busy} style={({ pressed }) => [styles.button, { marginTop: 12 }, pressed && { opacity: 0.88 }]}>
-            {busy ? <ActivityIndicator color={D.white} /> : <Text style={styles.buttonText}>Получить код</Text>}
-          </Pressable>
-          {/* G1 · гостевой вход (утверждено 09.10); «Продолжить с Apple» — в сборке для App Store */}
-          <Pressable onPress={guest} hitSlop={10} style={{ alignSelf: 'center', marginTop: 20 }}>
-            <Text style={styles.guest}>Смотреть карту без входа</Text>
-          </Pressable>
+          </Animated.View>
+          <Animated.View style={t5}>
+            <Pressable onPress={onSend} disabled={busy} style={({ pressed }) => [styles.button, { marginTop: 12 }, pressed && { opacity: 0.88 }]}>
+              {busy ? <ActivityIndicator color={D.white} /> : <Text style={styles.buttonText}>Получить код</Text>}
+            </Pressable>
+            {/* G1 · гостевой вход (утверждено 09.10); «Продолжить с Apple» — в сборке для App Store */}
+            <Pressable onPress={guest} hitSlop={10} style={{ alignSelf: 'center', marginTop: 20 }}>
+              <Text style={styles.guest}>Смотреть карту без входа</Text>
+            </Pressable>
+          </Animated.View>
         </View>
       </KeyboardAvoidingView>
     </View>

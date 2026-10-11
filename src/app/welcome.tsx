@@ -79,7 +79,20 @@ export default function Welcome() {
   const progress = useSharedValue(0);
   const start = useSharedValue(0);
   const [page, setPage] = useState(0);
-  const toSignIn = () => router.replace('/sign-in');
+  // Уход на A4 в том же стиле: тёмная шторка наезжает справа (зеркально A1 → A2), экран под ней
+  // сдвигается с параллаксом, затем A4 без системной анимации — его снимки и текст влетают сами.
+  const exit = useSharedValue(0);
+  const leaving = useSharedValue(false);
+  const go = () => router.replace({ pathname: '/sign-in', params: { from: 'welcome' } });
+  const toSignIn = () => {
+    if (leaving.value) return;
+    leaving.value = true;
+    exit.value = withTiming(1, { duration: 650, easing: EASE }, (done) => {
+      if (done) scheduleOnRN(go);
+    });
+  };
+  const under = useAnimatedStyle(() => ({ transform: [{ translateX: -exit.value * width * 0.3 }] }));
+  const curtain = useAnimatedStyle(() => ({ transform: [{ translateX: (1 - exit.value) * width }] }));
 
   useAnimatedReaction(
     () => Math.round(progress.value),
@@ -118,12 +131,15 @@ export default function Welcome() {
     <GestureDetector gesture={pan}>
       <Animated.View style={{ flex: 1, backgroundColor: D.paper }}>
         <StatusBar style={page === 0 ? 'light' : 'dark'} />
-        {/* A1 — верхний слой: тёмная «шторка» уезжает и открывает бумагу A2 под собой */}
-        <A2 progress={progress} width={width} />
-        <A3 progress={progress} width={width} />
-        <A1 progress={progress} width={width} />
-        <Skip progress={progress} active={page < LAST} onPress={toSignIn} />
-        <Bottom progress={progress} onNext={next} />
+        <Animated.View style={[StyleSheet.absoluteFill, under]}>
+          {/* A1 — верхний слой: тёмная «шторка» уезжает и открывает бумагу A2 под собой */}
+          <A2 progress={progress} width={width} />
+          <A3 progress={progress} width={width} />
+          <A1 progress={progress} width={width} />
+          <Skip progress={progress} active={page < LAST} onPress={toSignIn} />
+          <Bottom progress={progress} onNext={next} />
+        </Animated.View>
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: D.night }, curtain]} />
       </Animated.View>
     </GestureDetector>
   );

@@ -43,7 +43,14 @@ export default function RootLayout() {
           <Stack.Screen name="search" options={{ animation: 'fade', animationDuration: 200 }} />
           <Stack.Screen name="add" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="new" options={{ presentation: 'transparentModal', animation: 'none', contentStyle: { backgroundColor: 'transparent' } }} />
-          <Stack.Screen name="sign-in" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen
+            name="sign-in"
+            // из онбординга — без системной анимации: A3 закрывает тёмная шторка, A4 влетает сам
+            options={({ route }) => ({
+              presentation: 'fullScreenModal',
+              animation: (route.params as { from?: string } | undefined)?.from === 'welcome' ? 'none' : 'default',
+            })}
+          />
           <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal', animation: 'none', gestureEnabled: false }} />
           <Stack.Screen name="profile-setup" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
           <Stack.Screen name="permissions" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
