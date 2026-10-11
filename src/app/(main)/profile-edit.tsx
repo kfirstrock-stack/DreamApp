@@ -20,8 +20,9 @@ export default function ProfileEdit() {
   const [name, setName] = useState(profile?.display_name ?? '');
   const [nick, setNick] = useState(profile?.username ?? '');
   const [bio, setBio] = useState(profile?.bio ?? '');
+  const [city, setCity] = useState(profile?.city ?? '');
   const [nickState, setNickState] = useState<NickState>('free');
-  const [focus, setFocus] = useState<'name' | 'nick' | 'bio' | null>(null);
+  const [focus, setFocus] = useState<'name' | 'nick' | 'city' | 'bio' | null>(null);
   const [avatar, setAvatar] = useState<{ uri: string; base64: string } | null>(null);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -55,7 +56,7 @@ export default function ProfileEdit() {
       if (avatar?.base64) avatar_url = await uploadAvatar(uid, avatar.base64);
       const { error } = await supabase
         .from('profiles')
-        .update({ display_name: name.trim(), username: nick.trim().toLowerCase(), bio: bio.trim() || null, avatar_url })
+        .update({ display_name: name.trim(), username: nick.trim().toLowerCase(), city: city.trim() || null, bio: bio.trim() || null, avatar_url })
         .eq('id', uid);
       if (error) throw error;
       await refreshProfile();
@@ -139,6 +140,23 @@ export default function ProfileEdit() {
               {nickState === 'checking' && <ActivityIndicator size="small" color={D.ink40} />}
             </View>
             {shownNickHint ? <Text style={[styles.hint, nickState === 'taken' && { color: D.sun }]}>{shownNickHint}</Text> : null}
+          </View>
+          {/* город — по желанию, виден в D3 рядом с ником (утверждено 12.10) */}
+          <View style={styles.group}>
+            <Text style={styles.label}>ГОРОД</Text>
+            <TextInput
+              value={city}
+              onChangeText={setCity}
+              onFocus={() => setFocus('city')}
+              onBlur={() => setFocus(null)}
+              placeholder="Где вы чаще всего снимаете"
+              placeholderTextColor={D.ink40}
+              selectionColor={D.sun}
+              autoCapitalize="words"
+              textContentType="addressCity"
+              maxLength={40}
+              style={[styles.field, focus === 'city' && styles.fieldOn]}
+            />
           </View>
           <View style={styles.group}>
             <Text style={styles.label}>О СЕБЕ</Text>

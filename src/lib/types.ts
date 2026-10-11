@@ -27,4 +27,5 @@ export type Profile = {
   display_name: string | null;
   avatar_url: string | null;
   bio: string | null;
+  city?: string | null;
 };

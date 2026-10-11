@@ -69,7 +69,9 @@ export default function UserScreen() {
             <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
               {name}
             </Text>
-            <Text style={styles.nick}>{p?.username ? `@${p.username.toUpperCase()}` : ' '}</Text>
+            <Text style={styles.nick} numberOfLines={1}>
+              {[p?.username ? `@${p.username}` : '', p?.city ?? ''].filter(Boolean).join(' · ').toUpperCase() || ' '}
+            </Text>
           </View>
         </View>
 
