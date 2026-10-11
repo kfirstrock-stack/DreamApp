@@ -49,7 +49,8 @@ export default function Permissions() {
         <Pressable onPress={done} style={({ pressed }) => [styles.button, pressed && { opacity: 0.88 }]}>
           <Text style={styles.buttonText}>Продолжить</Text>
         </Pressable>
-        <Pressable onPress={done} hitSlop={10} style={{ alignSelf: 'center', marginTop: 20, marginBottom: Math.max(insets.bottom + 25, 24) }}>
+        {/* 32 pt от кнопки и зона нажатия 45 pt, не заходящая на кнопку (как на A4) */}
+        <Pressable onPress={done} hitSlop={{ left: 16, right: 16 }} style={{ alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13, marginBottom: Math.max(insets.bottom + 25 - 13, 11) }}>
           <Text style={styles.later}>Позже</Text>
         </Pressable>
       </ScrollView>
