@@ -24,3 +24,8 @@ export function hideSplash(delay = 0) {
   splashHidden = true;
   setTimeout(() => SplashScreen.hideAsync().catch(() => {}), delay);
 }
+
+// Только для проверки в разработке: снова показать онбординг
+export async function resetOnboarded() {
+  await AsyncStorage.removeItem(KEY).catch(() => {});
+}
