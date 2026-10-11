@@ -153,10 +153,47 @@ function Dot({ progress, k }: { progress: P; k: number }) {
   return <Animated.View style={[styles.dot, st]} />;
 }
 
+const WORD = Array.from('Начать');
+type Word = { w: number; x: number[]; cw: number[] };
+
+// Буква проявляется в момент, когда над ней пролетает стрелка (см. arrow в Bottom)
+function Letter({ ch, i, progress, word }: { ch: string; i: number; progress: P; word: SharedValue<Word> }) {
+  const st = useAnimatedStyle(() => {
+    const v = Math.min(1, Math.max(0, progress.value - 1));
+    const { w, x, cw } = word.value;
+    // пока не измерили — просто по порядку
+    const c = w > 0 && x[i] != null ? (x[i] + cw[i] / 2 + 14) / (w + 28) : (i + 0.5) / WORD.length;
+    const t = 0.4 + c * 0.48;
+    return {
+      opacity: interpolate(v, [t - 0.03, t + 0.03], [0, 1], Extrapolation.CLAMP),
+      transform: [
+        { translateX: interpolate(v, [t - 0.03, t + 0.06], [8, 0], Extrapolation.CLAMP) },
+        { scale: interpolate(v, [t - 0.03, t + 0.06], [0.6, 1], Extrapolation.CLAMP) },
+      ],
+    };
+  });
+  return (
+    <Animated.Text
+      style={[styles.buttonText, st]}
+      onLayout={(e) => {
+        const { x, width } = e.nativeEvent.layout;
+        const xs = word.value.x.slice();
+        const ws = word.value.cw.slice();
+        xs[i] = x;
+        ws[i] = width;
+        word.value = { ...word.value, x: xs, cw: ws };
+      }}
+    >
+      {ch}
+    </Animated.Text>
+  );
+}
+
 function Bottom({ progress, onNext }: { progress: P; onNext: () => void }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   // Круглая стрелка на пути к A3 вытягивается влево в длинную кнопку «Начать» (как в макете A3)
+  const word = useSharedValue<Word>({ w: 0, x: [], cw: [] });
   const dots = useAnimatedStyle(() => ({ opacity: interpolate(progress.value, [1, 1.35], [1, 0], Extrapolation.CLAMP) }));
   const btn = useAnimatedStyle(() => {
     const v = Math.min(1, Math.max(0, progress.value - 1));
@@ -169,18 +206,19 @@ function Bottom({ progress, onNext }: { progress: P; onNext: () => void }) {
       bottom: insets.bottom - 4 + 6 * k,
     };
   });
+  // Стрелка «пишет» слово: чуть отходит назад, уменьшается до размера букв и пролетает слева направо —
+  // за ней по одной проявляются буквы «Начать»; в конце стрелка тает. Назад — стирает слово обратно.
   const arrow = useAnimatedStyle(() => {
     const v = Math.min(1, Math.max(0, progress.value - 1));
+    const { w } = word.value;
+    const L = -w / 2 - 14;
+    const R = w / 2 + 14;
     return {
-      opacity: interpolate(v, [0, 0.35], [1, 0], Extrapolation.CLAMP),
-      transform: [{ translateX: interpolate(v, [0, 0.35], [0, 14], Extrapolation.CLAMP) }],
-    };
-  });
-  const label = useAnimatedStyle(() => {
-    const v = Math.min(1, Math.max(0, progress.value - 1));
-    return {
-      opacity: interpolate(v, [0.55, 1], [0, 1], Extrapolation.CLAMP),
-      transform: [{ scale: interpolate(v, [0.55, 1], [0.92, 1], Extrapolation.CLAMP) }],
+      opacity: interpolate(v, [0.86, 0.98], [1, 0], Extrapolation.CLAMP),
+      transform: [
+        { translateX: interpolate(v, [0, 0.16, 0.4, 0.88], [0, 0, L, R], Extrapolation.CLAMP) },
+        { scale: interpolate(v, [0, 0.16, 0.4, 0.86, 0.98], [1, 1, 0.7, 0.7, 0.3], Extrapolation.CLAMP) },
+      ],
     };
   });
   return (
@@ -194,13 +232,15 @@ function Bottom({ progress, onNext }: { progress: P; onNext: () => void }) {
       </Animated.View>
       <Animated.View style={[styles.morph, btn]}>
         <Pressable onPress={onNext} style={({ pressed }) => [styles.morphPress, pressed && { opacity: 0.88 }]} accessibilityRole="button">
-          <Animated.View style={[styles.morphCenter, arrow]}>
+          <View style={styles.morphCenter} pointerEvents="none">
+            <View style={styles.word} onLayout={(e) => (word.value = { ...word.value, w: e.nativeEvent.layout.width })}>
+              {WORD.map((ch, i) => (
+                <Letter key={i} ch={ch} i={i} progress={progress} word={word} />
+              ))}
+            </View>
+          </View>
+          <Animated.View pointerEvents="none" style={[styles.morphCenter, arrow]}>
             <Icon name="arrow" size={27.6} color={D.white} />
-          </Animated.View>
-          <Animated.View style={[styles.morphCenter, label]}>
-            <Text style={styles.buttonText} numberOfLines={1}>
-              Начать
-            </Text>
           </Animated.View>
         </Pressable>
       </Animated.View>
@@ -341,7 +381,9 @@ const styles = StyleSheet.create({
   dotsRow: { position: 'absolute', left: 32, height: 60, justifyContent: 'center' },
   morph: { position: 'absolute', right: 32, backgroundColor: D.sun, overflow: 'hidden' },
   morphPress: { flex: 1 },
-  morphCenter: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  word: { flexDirection: 'row' },
+  // шире самой кнопки (она обрезает лишнее), чтобы слово мерилось и центрировалось одинаково при любой ширине
+  morphCenter: { position: 'absolute', left: -200, right: -200, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   dots: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 4 },
   chipWrap: { overflow: 'visible' },
