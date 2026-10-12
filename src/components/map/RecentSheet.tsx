@@ -2,7 +2,7 @@
 // Нажатие — карта летит туда, шкала — на это время. Закрыть — свайп вниз или нажатие на карту.
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -20,6 +20,7 @@ const photos = (n: number) => `${n} фото`;
 
 export function RecentSheet({ onClose, onPick }: { onClose: () => void; onPick: (m: RecentMoment) => void }) {
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const [list, setList] = useState<RecentMoment[] | null>(null);
   const [failed, setFailed] = useState(false);
   const drag = useSharedValue(0);
@@ -48,7 +49,7 @@ export function RecentSheet({ onClose, onPick }: { onClose: () => void; onPick: 
         exiting={SlideOutDown.duration(200)}
       >
       <GestureDetector gesture={pan}>
-        <Animated.View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 18 }, dragStyle]}>
+        <Animated.View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 18, maxHeight: height - insets.top - 40 }, dragStyle]}>
           <View style={styles.grab} />
           <Text style={styles.title}>Последние моменты</Text>
           <Text style={styles.intro}>Где снимали недавно — нажмите, чтобы перенестись туда и в то время.</Text>
@@ -59,6 +60,7 @@ export function RecentSheet({ onClose, onPick }: { onClose: () => void; onPick: 
           ) : list.length === 0 ? (
             <Text style={[styles.intro, { marginTop: 16 }]}>Пока никто ничего не снимал.</Text>
           ) : (
+            <ScrollView style={styles.scroll} bounces={false} showsVerticalScrollIndicator={false}>
             <View style={styles.card}>
               {list.map((m, i) => {
                 const t = new Date(m.bucket);
@@ -87,6 +89,7 @@ export function RecentSheet({ onClose, onPick }: { onClose: () => void; onPick: 
                 );
               })}
             </View>
+            </ScrollView>
           )}
         </Animated.View>
       </GestureDetector>
@@ -102,7 +105,8 @@ const styles = StyleSheet.create({
   title: { marginTop: 18, fontFamily: F.serif, fontSize: 28, color: D.ink },
   intro: { marginTop: 6, fontFamily: F.sans, fontSize: 14, lineHeight: 20, color: D.ink60 },
   wait: { height: 120, alignItems: 'center', justifyContent: 'center' },
-  card: { marginTop: 16, backgroundColor: D.white, borderRadius: 20 },
+  scroll: { flexGrow: 0, marginTop: 16 },
+  card: { backgroundColor: D.white, borderRadius: 20 },
   sep: { height: 1, marginHorizontal: 8, backgroundColor: D.line },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 16, paddingRight: 14, paddingVertical: 12, minHeight: 68 },
   img: { width: 44, height: 44, borderRadius: 10, backgroundColor: D.paper2 },
