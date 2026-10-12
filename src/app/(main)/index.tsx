@@ -156,9 +156,20 @@ export default function MapScreen() {
     },
     [size, sheet.y, insets.top],
   );
+  // После перелёта сами запоминаем область: если карта уже почти там, iOS не присылает onRegionChangeComplete,
+  // и снимки грузились бы для прежнего места (12.10: «К последним фото» ничего не показывало)
+  const flyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flyTo = useCallback(
-    (lat: number, lng: number, lngDelta?: number) => mapRef.current?.animateToRegion(focusRegion(lat, lng, lngDelta), 800),
-    [focusRegion],
+    (lat: number, lng: number, lngDelta?: number) => {
+      const r = focusRegion(lat, lng, lngDelta);
+      mapRef.current?.animateToRegion(r, 800);
+      if (flyTimer.current) clearTimeout(flyTimer.current);
+      flyTimer.current = setTimeout(() => {
+        regionSV.value = r;
+        setRegion(r);
+      }, 850);
+    },
+    [focusRegion, regionSV],
   );
 
   // Перейти к моменту: день + интервал на шкале (шкала доедет сама)
@@ -571,6 +582,7 @@ export default function MapScreen() {
           regionSV.value = r;
         }}
         onRegionChangeComplete={(r) => {
+          if (flyTimer.current) clearTimeout(flyTimer.current);
           regionSV.value = r;
           setRegion(r);
         }}
