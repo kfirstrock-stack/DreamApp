@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -23,33 +23,47 @@ export function RecentSheet({ onClose, onPick }: { onClose: () => void; onPick: 
   const { height } = useWindowDimensions();
   const [list, setList] = useState<RecentMoment[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const drag = useSharedValue(0);
+  // Появление и уход — своя анимация (12.10): встроенная SlideInDown на карте обрывалась, и шторка застревала на полпути
+  const y = useSharedValue(height); // сдвиг шторки вниз: height — за экраном, 0 — на месте
+  const shade = useSharedValue(0);
+  const closing = useSharedValue(false);
 
   useEffect(() => {
+    y.value = withSpring(0, SHEET_SPRING);
+    shade.value = withTiming(1, { duration: 180 });
     fetchRecentMoments(6).then(setList).catch(() => setFailed(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // закрываем с JS-потока: увели шторку вниз и через время анимации сообщили родителю
+  const close = (then?: () => void) => {
+    if (closing.value) return;
+    closing.value = true;
+    shade.value = withTiming(0, { duration: 200 });
+    y.value = withTiming(height, { duration: 220 });
+    setTimeout(then ?? onClose, 230);
+  };
+  const closeBySwipe = () => close();
 
   const pan = Gesture.Pan()
     .activeOffsetY(8)
     .onUpdate((e) => {
-      drag.value = Math.max(0, e.translationY);
+      if (!closing.value) y.value = Math.max(0, e.translationY);
     })
     .onEnd((e) => {
-      if (e.translationY > 90 || e.velocityY > 700) scheduleOnRN(onClose);
-      else drag.value = withSpring(0, SHEET_SPRING);
+      if (e.translationY > 90 || e.velocityY > 700) scheduleOnRN(closeBySwipe);
+      else y.value = withSpring(0, SHEET_SPRING);
     });
-  const dragStyle = useAnimatedStyle(() => ({ transform: [{ translateY: drag.value }] }));
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
+  const dimStyle = useAnimatedStyle(() => ({ opacity: shade.value }));
 
   return (
-    <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.dim}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Закрыть" />
-      {/* появление/уход и сдвиг пальцем — на разных слоях: на одном слое анимации мешают друг другу и шторка застревала внизу */}
-      <Animated.View
-        entering={SlideInDown.springify().damping(SHEET_SPRING.damping).stiffness(SHEET_SPRING.stiffness).mass(SHEET_SPRING.mass)}
-        exiting={SlideOutDown.duration(200)}
-      >
+    <View style={styles.wrap}>
+      <Animated.View style={[StyleSheet.absoluteFill, styles.dim, dimStyle]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => close()} accessibilityLabel="Закрыть" />
+      </Animated.View>
       <GestureDetector gesture={pan}>
-        <Animated.View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 18, maxHeight: height - insets.top - 40 }, dragStyle]}>
+        <Animated.View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 18, maxHeight: height - insets.top - 40 }, sheetStyle]}>
           <View style={styles.grab} />
           <Text style={styles.title}>Последние моменты</Text>
           <Text style={styles.intro}>Где снимали недавно — нажмите, чтобы перенестись туда и в то время.</Text>
@@ -69,7 +83,7 @@ export function RecentSheet({ onClose, onPick }: { onClose: () => void; onPick: 
                   <View key={`${m.bucket}|${m.lat}|${m.lng}`}>
                     {i > 0 && <View style={styles.sep} />}
                     <Pressable
-                      onPress={() => onPick(m)}
+                      onPress={() => close(() => onPick(m))}
                       style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}
                       accessibilityLabel={`${first ? 'Ваш последний момент: ' : ''}${m.place_name ?? 'Место'}, ${when(t)}, ${photos(m.photo_count)}`}
                     >
@@ -93,19 +107,19 @@ export function RecentSheet({ onClose, onPick }: { onClose: () => void; onPick: 
           )}
         </Animated.View>
       </GestureDetector>
-      </Animated.View>
-    </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  dim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(22,19,15,0.35)', justifyContent: 'flex-end', zIndex: 3000, elevation: 50 },
+  wrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-end', zIndex: 3000, elevation: 50 },
+  dim: { backgroundColor: 'rgba(22,19,15,0.35)' },
   sheet: { backgroundColor: D.paper, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10, paddingHorizontal: 24 },
   grab: { alignSelf: 'center', width: 36, height: 5, borderRadius: 3, backgroundColor: 'rgba(22,19,15,0.15)' },
   title: { marginTop: 18, fontFamily: F.serif, fontSize: 28, color: D.ink },
   intro: { marginTop: 6, fontFamily: F.sans, fontSize: 14, lineHeight: 20, color: D.ink60 },
   wait: { height: 120, alignItems: 'center', justifyContent: 'center' },
-  scroll: { flexGrow: 0, marginTop: 16 },
+  scroll: { flexGrow: 0, flexShrink: 1, marginTop: 16 },
   card: { backgroundColor: D.white, borderRadius: 20 },
   sep: { height: 1, marginHorizontal: 8, backgroundColor: D.line },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 16, paddingRight: 14, paddingVertical: 12, minHeight: 68 },
