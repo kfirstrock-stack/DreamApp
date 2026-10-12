@@ -42,12 +42,13 @@ export function RecentSheet({ onClose, onPick }: { onClose: () => void; onPick: 
   return (
     <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.dim}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Закрыть" />
+      {/* появление/уход и сдвиг пальцем — на разных слоях: на одном слое анимации мешают друг другу и шторка застревала внизу */}
+      <Animated.View
+        entering={SlideInDown.springify().damping(SHEET_SPRING.damping).stiffness(SHEET_SPRING.stiffness).mass(SHEET_SPRING.mass)}
+        exiting={SlideOutDown.duration(200)}
+      >
       <GestureDetector gesture={pan}>
-        <Animated.View
-          entering={SlideInDown.springify().damping(SHEET_SPRING.damping).stiffness(SHEET_SPRING.stiffness).mass(SHEET_SPRING.mass)}
-          exiting={SlideOutDown.duration(200)}
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 18 }, dragStyle]}
-        >
+        <Animated.View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 18 }, dragStyle]}>
           <View style={styles.grab} />
           <Text style={styles.title}>Последние моменты</Text>
           <Text style={styles.intro}>Где снимали недавно — нажмите, чтобы перенестись туда и в то время.</Text>
@@ -89,6 +90,7 @@ export function RecentSheet({ onClose, onPick }: { onClose: () => void; onPick: 
           )}
         </Animated.View>
       </GestureDetector>
+      </Animated.View>
     </Animated.View>
   );
 }
