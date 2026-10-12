@@ -92,6 +92,28 @@ export default function MomentScreen() {
           <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
           <RoundButton icon="map" label="Показать на карте" onPress={showOnMap} />
         </View>
+        {photos === null ? (
+          // E3 · Загрузка (по макету): заглушки заголовка, строки, интервалов и сетки; кнопки сверху — живые
+          <View>
+            <View style={[styles.sk, { width: 280, height: 30, borderRadius: 10, marginTop: 20, marginLeft: 20 }]} />
+            <View style={[styles.sk, { width: 210, height: 12, borderRadius: 6, marginTop: 12, marginLeft: 20 }]} />
+            <View style={[styles.chips, { paddingVertical: 0, marginTop: 16, marginBottom: 18, flexDirection: 'row' }]}>
+              {[0, 1, 2, 3].map((k) => (
+                <View key={k} style={[styles.sk, { width: 80, height: 38, borderRadius: 19 }]} />
+              ))}
+            </View>
+            <View style={[styles.grid, { gap }]}>
+              {[[236, 186, 210], [168, 244, 220]].map((col, ci) => (
+                <View key={ci} style={{ width: colW, gap }}>
+                  {col.map((h, k) => (
+                    <View key={k} style={[styles.sk, { height: h, borderRadius: 18 }]} />
+                  ))}
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : (
+          <>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.meta}>{meta}</Text>
 
@@ -141,6 +163,8 @@ export default function MomentScreen() {
             </View>
           ))}
         </View>
+          </>
+        )}
       </ScrollView>
 
       <TabBar
@@ -156,6 +180,7 @@ export default function MomentScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: D.paper },
+  sk: { backgroundColor: D.paper2 }, // E3 · заглушка
   headRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 },
   title: { fontFamily: F.serifItalic, fontSize: 31, lineHeight: 38, color: D.ink, paddingHorizontal: 20, marginTop: 16 },
   meta: { fontFamily: F.mono, fontSize: 11, color: D.ink60, letterSpacing: 0.8, paddingHorizontal: 20, marginTop: 6 },

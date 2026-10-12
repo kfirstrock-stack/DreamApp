@@ -371,13 +371,19 @@ export default function PhotoScreen() {
   }
   if (failed === 'gone' || photo?.hidden) {
     return (
-      <View style={[styles.root, styles.center, { padding: 32 }]}>
-        <View style={styles.goneIcon}>
-          <Icon name="eyeOff" size={36} color={D.paper} />
+      // E4 · Фото недоступно (по макету): назад сверху, знак, заголовок, пояснение, «Вернуться к моменту» внизу
+      <View style={[styles.root, { paddingTop: insets.top + 12, paddingBottom: Math.max(insets.bottom, 16) + 64 }]}>
+        <View style={{ paddingHorizontal: 16 }}>
+          <RoundButton icon="back" tone="glass" label="Назад" onPress={() => router.back()} />
         </View>
-        <Text style={styles.goneTitle}>Фото больше недоступно</Text>
-        <Text style={styles.goneText}>Автор удалил его или оно скрыто после жалоб.</Text>
-        <PillButton title="Назад" onPress={() => router.back()} style={{ marginTop: 24, alignSelf: 'stretch' }} />
+        <View style={[styles.center, { flex: 1, paddingHorizontal: 32 }]}>
+          <View style={styles.goneIcon}>
+            <Icon name="eyeOff" size={40} color={D.paper} />
+          </View>
+          <Text style={styles.goneTitle}>Фото больше недоступно</Text>
+          <Text style={styles.goneText}>Автор удалил его или оно скрыто после жалоб. Остальные снимки этого момента на месте.</Text>
+        </View>
+        <PillButton title="Вернуться к моменту" onPress={() => router.back()} style={{ marginHorizontal: 32 }} />
       </View>
     );
   }
@@ -711,8 +717,8 @@ const styles = StyleSheet.create({
   whoSub: { fontFamily: F.sans, fontSize: 13, color: 'rgba(244,239,230,0.55)' },
   go: { width: 36, height: 36, borderRadius: 18, backgroundColor: D.sun, alignItems: 'center', justifyContent: 'center' },
   goneIcon: { width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(244,239,230,0.08)', alignItems: 'center', justifyContent: 'center' },
-  goneTitle: { fontFamily: F.serif, fontSize: 28, color: D.paper, marginTop: 24, textAlign: 'center' },
-  goneText: { fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: D.paper, opacity: 0.6, marginTop: 10, textAlign: 'center' },
+  goneTitle: { fontFamily: F.serif, fontSize: 30, color: D.paper, marginTop: 28, textAlign: 'center' },
+  goneText: { fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: D.paper, opacity: 0.6, marginTop: 8, textAlign: 'center' },
   backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,14,12,0.55)', justifyContent: 'flex-end' },
   menu: { backgroundColor: D.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 10 },
 

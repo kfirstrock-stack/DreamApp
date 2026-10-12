@@ -634,7 +634,12 @@ export default function MapScreen() {
         showsPointsOfInterests={false}
       />
 
-      {size.w > 0 && <MomentLayer pins={pins} region={regionSV} width={size.w} height={size.h} now={now} onPress={onPinPress} />}
+      {/* E1: без сети сохранённые снимки приглушены */}
+      {size.w > 0 && (
+        <View style={[StyleSheet.absoluteFill, offline && { opacity: 0.55 }]} pointerEvents="box-none">
+          <MomentLayer pins={pins} region={regionSV} width={size.w} height={size.h} now={now} onPress={onPinPress} />
+        </View>
+      )}
 
       {/* Верх: поиск (название места) и слои — B1 */}
       <View style={[styles.top, { top: insets.top + 8 }]} pointerEvents="box-none">
@@ -657,7 +662,25 @@ export default function MapScreen() {
 
       {offline && (
         <Animated.View entering={FadeIn} exiting={FadeOut} style={[styles.banner, { top: insets.top + 64 }]}>
-          <Text style={styles.bannerText}>Нет связи · показываем сохранённое</Text>
+          <Icon name="wifiOff" size={18} color={D.paper} />
+          <Text style={styles.bannerText}>Нет сети · показываем сохранённое</Text>
+        </Animated.View>
+      )}
+      {/* E1 · «Повторить»: там же, где карточка пустого дня — над шкалой */}
+      {offline && sheet.h > 0 && (
+        <Animated.View entering={FadeIn} exiting={FadeOut} style={[styles.retryWrap, { bottom: sheetBottom + sheet.h + 74 }]} pointerEvents="box-none">
+          <Pressable
+            onPress={() => {
+              setOffline(false);
+              setReload((k) => k + 1);
+            }}
+            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.8 }]}
+            hitSlop={6}
+            accessibilityLabel="Повторить загрузку"
+          >
+            <Icon name="refresh" size={16} color={D.ink} />
+            <Text style={styles.retryText}>Повторить</Text>
+          </Pressable>
         </Animated.View>
       )}
 
@@ -920,8 +943,19 @@ const styles = StyleSheet.create({
   summaryAvas: { flexDirection: 'row' },
   summaryAva: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: D.white, margin: -2 },
   summaryText: { flex: 1, fontFamily: F.sansMedium, fontSize: 13, color: D.ink },
-  banner: { position: 'absolute', alignSelf: 'center', backgroundColor: D.ink, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, zIndex: 1000, elevation: 30 },
-  bannerText: { fontFamily: F.sansMedium, fontSize: 13, color: D.paper },
+  // E1 · Нет сети
+  banner: {
+    position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: D.ink,
+    paddingLeft: 14, paddingRight: 16, paddingVertical: 11, borderRadius: 999, zIndex: 1000, elevation: 30,
+    shadowColor: '#17120D', shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 8 },
+  },
+  bannerText: { fontFamily: F.sansMedium, fontSize: 14, color: D.paper },
+  retryWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 900 },
+  retry: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: D.white, paddingLeft: 14, paddingRight: 16, paddingVertical: 12, borderRadius: 999,
+    shadowColor: '#17120D', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 6 }, elevation: 6,
+  },
+  retryText: { fontFamily: F.sansSemi, fontSize: 14, color: D.ink },
   empty: {
     position: 'absolute', alignSelf: 'center', alignItems: 'center', gap: 10, backgroundColor: D.white,
     padding: 16, borderRadius: 20, ...softShadow, zIndex: 1000, elevation: 30,

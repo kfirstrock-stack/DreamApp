@@ -42,6 +42,8 @@ const ICONS = {
   lock: { ios: 'lock', android: 'lock' },
   settings: { ios: 'gearshape', android: 'settings' },
   alert: { ios: 'exclamationmark.circle', android: 'error' },
+  wifiOff: { ios: 'wifi.slash', android: 'wifi_off' },
+  refresh: { ios: 'arrow.clockwise', android: 'refresh' },
 } as const;
 
 export type IconName = keyof typeof ICONS;
@@ -52,9 +54,9 @@ export function Icon({ name, size = 22, color = '#16130F' }: { name: IconName; s
     const filled = name === 'heartFill' || name === 'more';
     return (
       <Svg width={size} height={size} viewBox="0 0 24 24">
-        {parts.map(([x, y, sw, d], i) => (
-          <G key={i} transform={`translate(${x} ${y})`}>
-            <Path d={d} fill={filled ? (color as string) : 'none'} stroke={color as string} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
+        {parts.map(([x, y, sw, d, k = 1], i) => (
+          <G key={i} transform={`translate(${x} ${y})${k !== 1 ? ` scale(${k})` : ''}`}>
+            <Path d={d} fill={filled ? (color as string) : 'none'} stroke={color as string} strokeWidth={sw / k} strokeLinecap="round" strokeLinejoin="round" />
           </G>
         ))}
       </Svg>
