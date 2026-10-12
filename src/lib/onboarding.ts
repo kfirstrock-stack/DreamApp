@@ -40,10 +40,7 @@ export function setAuthFromWelcome(v: boolean) {
 export function leaveAuth() {
   if (fromWelcome) {
     fromWelcome = false;
-    // 12.10: dismissTo('/') иногда не находил карту под онбордингом и открывал её «листом» поверх A1–A3.
-    // Надёжнее: закрыть все экраны поверх первого и поставить карту на его место.
-    if (router.canDismiss()) router.dismissAll();
-    router.replace('/');
+    router.dismissTo('/');
   } else if (router.canGoBack()) router.back();
   // открыли экран по ссылке или после перезагрузки — под ним ничего нет, идём на карту
   else router.replace('/');
