@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { memo, useEffect, useMemo, type ReactNode, useRef } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -19,9 +19,17 @@ const BAR_W = 6;
 const MAX_H = 52;
 const INSET = 20;
 
+// Бесконечная шкала (утверждено 12.10): в шкале сразу три диапазона — предыдущий, текущий и следующий
+// (если он не в будущем). Положение x — в столбиках ТЕКУЩЕГО диапазона: минус — предыдущий, ≥ curLen — следующий.
+// Перешли границу — родитель делает соседний диапазон текущим и присылает shift: шкала незаметно
+// пересчитывает x, движение пальца и инерция продолжаются без рывка.
 type Props = {
-  counts: number[];
-  initialIndex: number;
+  counts: number[]; // столбики всех трёх диапазонов подряд
+  offset: number; // сколько столбиков предыдущего диапазона стоит перед текущим
+  curLen: number; // столбиков в текущем диапазоне
+  shift?: { by: number; key: number } | null; // текущий диапазон сменился: сдвинуть x на by столбиков
+  initialIndex: number; // в столбиках текущего диапазона
+  onSettle?: () => void; // шкала остановилась (после пальца, инерции, тапа или команды)
   now: SharedValue<number>; // текущее время, минуты от начала дня (дробное) — для проявления фото
   index: SharedValue<number>; // текущий интервал — для цифр времени
   onIndexChange: (i: number) => void;
@@ -31,14 +39,11 @@ type Props = {
   footer?: ReactNode;
   ticks?: { i: number; label: string }[]; // подписи под шкалой
   compact?: boolean; // S2: тонкие столбики 24 пт без подписей
-  // Бесконечная шкала (утверждено 12.10): потянули за край — соседние сутки/месяц/год.
-  onEdge?: (dir: -1 | 1) => void;
-  canNext?: boolean; // вперёд — не дальше «сейчас»
 };
 
-const Bar = memo(function Bar({ i, h, w, x }: { i: number; h: number; w: number; x: SharedValue<number> }) {
+const Bar = memo(function Bar({ i, h, w, x, off }: { i: number; h: number; w: number; x: SharedValue<number>; off: SharedValue<number> }) {
   const style = useAnimatedStyle(() => {
-    const d = Math.abs(x.value / ITEM - i);
+    const d = Math.abs(x.value / ITEM + off.value - i);
     const lens = d < 4 ? 1 - d / 4 : 0;
     return {
       transform: [{ scaleY: 1 + 0.3 * lens }],
@@ -51,7 +56,7 @@ const Bar = memo(function Bar({ i, h, w, x }: { i: number; h: number; w: number;
 // Шкала-гистограмма суток: едет за пальцем, после броска докатывается по инерции,
 // тап по гистограмме — переход к моменту, щелчок вибрацией на каждом шаге.
 export const TimeScrubber = memo(function TimeScrubber({
-  counts, initialIndex, now, index, onIndexChange, jumpTo, sidePadding = 12, header, footer, ticks, compact = false, onEdge, canNext = false,
+  counts, offset, curLen, shift, initialIndex, onSettle, now, index, onIndexChange, jumpTo, sidePadding = 12, header, footer, ticks, compact = false,
 }: Props) {
   const maxH = compact ? 20 : MAX_H;
   const barW = compact ? 4 : BAR_W;
@@ -60,8 +65,11 @@ export const TimeScrubber = memo(function TimeScrubber({
   const { width } = useWindowDimensions();
   const innerW = width - sidePadding * 2 - INSET * 2; // B1: шкала с отступом 20 от краёв карточки
   const center = innerW / 2;
-  const maxX = (BUCKETS - 1) * ITEM;
+  const minX = -offset * ITEM; // начало предыдущего диапазона
+  const maxX = (BUCKETS - offset - 1) * ITEM; // конец следующего (или текущего, если следующий в будущем)
   const x = useSharedValue(initialIndex * ITEM);
+  const off = useSharedValue(offset);
+  const lenSV = useSharedValue(curLen);
   const startX = useSharedValue(0);
   const barsTop = useSharedValue(0);
   const moving = useSharedValue(false);
@@ -70,21 +78,31 @@ export const TimeScrubber = memo(function TimeScrubber({
   const heights = useMemo(() => counts.map((c) => (c === 0 ? (compact ? 2 : 3) : (compact ? 5 : 8) + (c / max) * (maxH - (compact ? 5 : 8)))), [counts, max, maxH, compact]);
 
   const auto = useSharedValue(false); // шкала едет сама (по команде) — без вибрации
-  // край шкалы: зовём родителя с JS-потока (через ref — всегда свежий обработчик)
-  const edgeRef = useRef(onEdge);
-  edgeRef.current = onEdge;
-  const hasEdge = !!onEdge;
-  const edge = (dir: -1 | 1) => edgeRef.current?.(dir);
+  const settleRef = useRef(onSettle);
+  settleRef.current = onSettle;
+  const settled = () => settleRef.current?.();
   const tick = (i: number, quiet: boolean) => {
     if (!quiet) Haptics.selectionAsync().catch(() => {});
     onIndexChange(i);
   };
 
+  // смена диапазона: новый offset и сдвиг x — одним кадром, чтобы картинка не дёрнулась
+  useLayoutEffect(() => {
+    off.value = offset;
+    lenSV.value = curLen;
+    if (shift) {
+      x.value = x.value + shift.by * ITEM;
+      startX.value = startX.value + shift.by * ITEM;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offset, curLen, shift?.key]);
+
   useAnimatedReaction(
-    () => Math.min(BUCKETS - 1, Math.max(0, Math.round(x.value / ITEM))),
+    () => Math.round(x.value / ITEM),
     (i, prev) => {
       if (prev !== null && i !== prev) {
-        index.value = i;
+        // для цифр — время внутри своего диапазона (у соседнего — со своего конца/начала)
+        index.value = i < 0 ? i + off.value : i >= lenSV.value ? i - lenSV.value : i;
         scheduleOnRN(tick, i, auto.value);
       }
     },
@@ -103,7 +121,10 @@ export const TimeScrubber = memo(function TimeScrubber({
     moving.value = true;
     auto.value = true;
     x.value = withSpring(jumpTo.i * ITEM, { damping: 26, stiffness: 120, mass: 1 }, (done) => {
-      if (done) moving.value = false;
+      if (done) {
+        moving.value = false;
+        scheduleOnRN(settled);
+      }
       auto.value = false;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -112,10 +133,13 @@ export const TimeScrubber = memo(function TimeScrubber({
   const gesture = useMemo(() => {
     const settle = () => {
       'worklet';
-      const t = Math.min(maxX, Math.max(0, Math.round(x.value / ITEM) * ITEM));
+      const t = Math.min(maxX, Math.max(minX, Math.round(x.value / ITEM) * ITEM));
       moving.value = true;
       x.value = withSpring(t, { damping: 30, stiffness: 260, mass: 0.6 }, (done) => {
-        if (done) moving.value = false;
+        if (done) {
+          moving.value = false;
+          scheduleOnRN(settled);
+        }
       });
     };
     const pan = Gesture.Pan()
@@ -129,30 +153,16 @@ export const TimeScrubber = memo(function TimeScrubber({
       })
       .onUpdate((e) => {
         const raw = startX.value - e.translationX;
-        x.value = raw < 0 ? raw * 0.3 : raw > maxX ? maxX + (raw - maxX) * 0.3 : raw;
+        x.value = raw < minX ? minX + (raw - minX) * 0.3 : raw > maxX ? maxX + (raw - maxX) * 0.3 : raw;
       })
       .onEnd((e) => {
         const v = -e.velocityX;
-        // за левый край (раньше 00:00) — предыдущий диапазон, шкала продолжает с его конца
-        if (hasEdge && (x.value < -ITEM * 0.8 || (x.value <= 0 && v < -900))) {
-          x.value = maxX + ITEM + Math.min(0, x.value);
-          scheduleOnRN(edge, -1);
-          settle();
-          return;
-        }
-        // за правый край — следующий диапазон (если он не в будущем)
-        if (hasEdge && canNext && (x.value > maxX + ITEM * 0.8 || (x.value >= maxX && v > 900))) {
-          x.value = Math.max(0, x.value - maxX) - ITEM;
-          scheduleOnRN(edge, 1);
-          settle();
-          return;
-        }
-        if (Math.abs(v) < 60 || x.value < 0 || x.value > maxX) {
+        if (Math.abs(v) < 60 || x.value < minX || x.value > maxX) {
           settle();
           return;
         }
         moving.value = true;
-        x.value = withDecay({ velocity: v, deceleration: 0.9975, clamp: [0, maxX], rubberBandEffect: true, rubberBandFactor: 0.6 }, (finished) => {
+        x.value = withDecay({ velocity: v, deceleration: 0.9975, clamp: [minX, maxX], rubberBandEffect: true, rubberBandFactor: 0.6 }, (finished) => {
           if (finished) settle();
         });
       })
@@ -164,17 +174,20 @@ export const TimeScrubber = memo(function TimeScrubber({
       .maxDistance(6)
       .onEnd((e) => {
         if (caught.value || e.y < barsTop.value) return;
-        const t = Math.min(maxX, Math.max(0, Math.round((x.value + (e.x - INSET - center)) / ITEM) * ITEM));
+        const t = Math.min(maxX, Math.max(minX, Math.round((x.value + (e.x - INSET - center)) / ITEM) * ITEM));
         moving.value = true;
         x.value = withSpring(t, { damping: 26, stiffness: 180, mass: 0.8 }, (done) => {
-          if (done) moving.value = false;
+          if (done) {
+          moving.value = false;
+          scheduleOnRN(settled);
+        }
         });
       });
     return Gesture.Exclusive(pan, tap);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maxX, center, hasEdge, canNext]);
+  }, [minX, maxX, center]);
 
-  const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: center - ITEM / 2 - x.value }] }));
+  const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: center - ITEM / 2 - x.value - off.value * ITEM }] }));
 
   return (
     <GestureDetector gesture={gesture}>
@@ -187,7 +200,7 @@ export const TimeScrubber = memo(function TimeScrubber({
             <View style={[styles.bars, { height: H, marginTop: 6 }]}>
               {heights.map((h, i) => (
                 <View key={i} style={styles.slot}>
-                  <Bar i={i} h={h} w={barW} x={x} />
+                  <Bar i={i} h={h} w={barW} x={x} off={off} />
                 </View>
               ))}
             </View>

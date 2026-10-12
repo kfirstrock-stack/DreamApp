@@ -100,6 +100,14 @@ export default function MapScreen() {
 
   const [step, setStep] = useState<Step>(stepPref);
   const [start, setStart] = useState(() => rangeStart(stepPref, new Date()));
+  // Бесконечная шкала: диапазон, вокруг которого сейчас построена шкала (пред. + этот + след.).
+  // Пока палец едет по соседнему дню, start уже он, а win — прежний; совпадут, когда шкала остановится.
+  const [win, setWin] = useState(start);
+  const [shift, setShift] = useState<{ by: number; key: number } | null>(null);
+  const setDay = (st: Date) => {
+    setStart(st);
+    setWin(st);
+  };
   const [index, setIndex] = useState(() => bucketIndex(stepPref, rangeStart(stepPref, new Date()), new Date()));
   const [stepMenu, setStepMenu] = useState(false);
   const [mode, setModeState] = useState<ScaleMode>(scaleModePref);
@@ -158,6 +166,7 @@ export default function MapScreen() {
     (at: Date) => {
       const st = rangeStart(step, at);
       setStart(st);
+      setWin(st);
       setJump({ i: bucketIndex(step, st, at), key: Date.now() });
     },
     [step],
@@ -178,7 +187,7 @@ export default function MapScreen() {
     const i = bucketIndex(next, st, moment);
     stepPref = next;
     setStep(next);
-    setStart(st);
+    setDay(st);
     setIndex(i);
     indexSV.value = i;
     now.value = i * STEP_MIN + STEP_MIN / 2;
@@ -195,27 +204,46 @@ export default function MapScreen() {
       if (st > new Date()) return;
       i = 0;
     }
-    if (st !== start) setStart(st);
+    if (st !== start) setDay(st);
     setIndex(i);
     indexSV.value = i;
     now.value = withTiming(i * STEP_MIN + STEP_MIN / 2, { duration: 260 });
     Haptics.selectionAsync().catch(() => {});
   };
-  // Бесконечная шкала: шкала уже доехала до края соседнего диапазона — переключаем день/месяц/год
-  // (стабильная функция: шкала пересобирает жест только при смене дня/шага, а не на каждом щелчке)
-  const edgeShift = useCallback(
-    (dir: -1 | 1) => {
-      setJump(null);
-      const st = shiftRange(step, start, dir);
-      if (dir > 0 && st > new Date()) return;
-      const i = dir < 0 ? bucketCount(step, st) - 1 : 0;
-      setStart(st);
-      setIndex(i);
-      indexSV.value = i;
-      now.value = i * STEP_MIN + STEP_MIN / 2;
+  // Бесконечная шкала: соседние диапазоны вокруг win
+  const winPrev = useMemo(() => shiftRange(step, win, -1), [step, win]);
+  const winNextRaw = useMemo(() => shiftRange(step, win, 1), [step, win]);
+  const winNext = winNextRaw <= new Date() ? winNextRaw : null; // в будущее не листаем
+  const prevLen = bucketCount(step, winPrev);
+  const winLen = bucketCount(step, win);
+  // шкала сообщает интервал в столбиках win: минус — предыдущий диапазон, ≥ winLen — следующий
+  const onScrub = useCallback(
+    (i: number) => {
+      let st = win, li = i;
+      if (i < 0) {
+        st = winPrev;
+        li = i + prevLen;
+      } else if (i >= winLen && winNext) {
+        st = winNext;
+        li = i - winLen;
+      }
+      setStart((cur) => (cur.getTime() === st.getTime() ? cur : st));
+      setIndex(li);
     },
-    [step, start, indexSV, now],
+    [win, winPrev, winNext, prevLen, winLen],
   );
+  // шкала остановилась в соседнем дне — перестраиваем её вокруг него (сдвиг x на тот же кадр, без рывка)
+  const startRef = useRef(start);
+  startRef.current = start;
+  const onSettle = useCallback(() => {
+    const cur = startRef.current;
+    if (cur.getTime() === win.getTime()) return;
+    const by = cur.getTime() < win.getTime() ? prevLen : -winLen;
+    setShift({ by, key: Date.now() });
+    setWin(cur);
+  }, [win, prevLen, winLen]);
+  // соседние диапазоны — для столбиков по краям шкалы
+  const [side, setSide] = useState(0);
   const miniGesture = Gesture.Race(
     // горизонталь: срабатывает рано и прощает «дугу» большого пальца (диагональ до ~45°)
     Gesture.Pan()
@@ -323,6 +351,43 @@ export default function MapScreen() {
     }
   }, [stepMenu]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // столбики шкалы: предыдущий + win + следующий диапазон
+  useEffect(() => {
+    let cancelled = false;
+    const need = [winPrev, win, ...(winNext ? [winNext] : [])].filter((st) => !photoCache.has(cacheKey(step, st, region)));
+    if (!need.length) return;
+    const t = setTimeout(() => {
+      Promise.all(need.map((st) => loadRange(step, st, region).catch(() => [])))
+        .then(() => !cancelled && setSide((k) => k + 1));
+    }, 150);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [step, win, winPrev, winNext, region]);
+  const countsOf = (st: Date, list: Photo[] | undefined) => {
+    const n = bucketCount(step, st);
+    const c = new Array(n).fill(0);
+    for (const p of list ?? []) {
+      const b = Math.floor(position(step, st, new Date(p.taken_at)));
+      if (b >= 0 && b < n) c[b]++;
+    }
+    return c;
+  };
+  const scale = useMemo(() => {
+    const listOf = (st: Date) =>
+      st.getTime() === start.getTime() ? photos : photoCache.get(cacheKey(step, st, region));
+    const a = countsOf(winPrev, listOf(winPrev));
+    const b = countsOf(win, listOf(win));
+    const c = winNext ? countsOf(winNext, listOf(winNext)) : [];
+    const tk = [
+      ...ticks(step, winPrev).filter((t) => t.i < a.length).map((t) => ({ ...t, i: t.i })),
+      ...ticks(step, win).filter((t) => t.i < b.length || !winNext).map((t) => ({ ...t, i: t.i + a.length })),
+      ...(winNext ? ticks(step, winNext).map((t) => ({ ...t, i: t.i + a.length + b.length })) : []),
+    ];
+    return { counts: [...a, ...b, ...c], offset: a.length, ticks: tk };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, win, winPrev, winNext, photos, start, region, side]);
   const counts = useMemo(() => {
     const n = bucketCount(step, start);
     const c = new Array(n).fill(0);
@@ -600,17 +665,19 @@ export default function MapScreen() {
         ) : (
           <Animated.View key="scale" entering={FadeIn.duration(220)}>
             <TimeScrubber
-              key={`${step}:${counts.length}`}
+              key={step}
               compact={mode === 'compact'}
-              ticks={ticks(step, start)}
-              counts={counts}
+              ticks={scale.ticks}
+              counts={scale.counts}
+              offset={scale.offset}
+              curLen={winLen}
+              shift={shift}
+              onSettle={onSettle}
               initialIndex={index}
               now={now}
               index={indexSV}
-              onIndexChange={setIndex}
+              onIndexChange={onScrub}
               jumpTo={jump}
-              onEdge={edgeShift}
-              canNext={!isToday}
               footer={
                 mode === 'full' ? (
             inWindow > 0 ? (
@@ -634,14 +701,14 @@ export default function MapScreen() {
               header={
             <View style={styles.head}>
               <View style={styles.dayRow}>
-                <Pressable hitSlop={10} onPress={() => setStart((st) => shiftRange(step, st, -1))} accessibilityLabel="Назад">
+                <Pressable hitSlop={10} onPress={() => setDay(shiftRange(step, start, -1))} accessibilityLabel="Назад">
                   <Icon name="chevL" size={16} color={D.ink60} />
                 </Pressable>
                 {/* B3: тап по дате — выбор даты и времени */}
                 <Pressable hitSlop={{ top: 10, bottom: 10 }} onPress={() => setDateSheet(true)} accessibilityRole="button" accessibilityLabel="Выбрать дату и время">
                   <Text style={styles.day}>{rangeLabel(step, start)}</Text>
                 </Pressable>
-                <Pressable hitSlop={10} disabled={isToday} onPress={() => setStart((st) => shiftRange(step, st, 1))} accessibilityLabel="Вперёд">
+                <Pressable hitSlop={10} disabled={isToday} onPress={() => setDay(shiftRange(step, start, 1))} accessibilityLabel="Вперёд">
                   <Icon name="chevR" size={16} color={isToday ? D.line : D.ink60} />
                 </Pressable>
                 <View style={{ flex: 1 }} />
