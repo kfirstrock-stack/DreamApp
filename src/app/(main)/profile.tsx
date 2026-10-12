@@ -2,7 +2,7 @@
 // Утверждено 11.10: шестерёнка вместо «Поделиться», карусель совпадений, подсказки в пустых разделах.
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -46,10 +46,11 @@ export default function ProfileScreen() {
     }, [uid]),
   );
 
-  if (!session) {
-    router.replace('/sign-in');
-    return <View style={styles.root} />;
-  }
+  // вышли из аккаунта — на вход, но не во время отрисовки (иначе React ругается «Cannot update a component…»)
+  useEffect(() => {
+    if (!session) router.replace('/sign-in');
+  }, [session]);
+  if (!session) return <View style={styles.root} />;
 
   const name = profile?.display_name || profile?.username || 'Вы';
   const tile = (content - 16) / 3;
