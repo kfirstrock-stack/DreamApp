@@ -287,7 +287,7 @@ export default function MapScreen() {
     });
   }, [ready, session]);
 
-  // При старте — к последнему моменту, где здесь есть фото: и карта, и шкала
+  // При старте — шкала на «сейчас», карта — к последнему снимку; если сегодня пусто, и шкала к нему
   const started = useRef(false);
   useEffect(() => {
     if (started.current || !size.w || !sheet.y) return;
@@ -296,7 +296,9 @@ export default function MapScreen() {
       .then((p) => {
         if (!p) return;
         flyTo(p.lat, p.lng);
-        goTo(new Date(p.taken_at));
+        // утверждено 12.10: первым экраном — «сейчас»; к последнему снимку по времени — только если сегодня здесь пусто
+        const today = rangeStart('15m', new Date());
+        if (new Date(p.taken_at) < today) goTo(new Date(p.taken_at));
       })
       .catch(() => setOffline(true));
   }, [size.w, sheet.y, flyTo, goTo]);
