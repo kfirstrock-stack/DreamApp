@@ -11,26 +11,41 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING } from '@/lib/design';
-import { draftFromPicker, setDraft, type Draft } from '@/lib/draft';
+import { draftFromPicker, loadSavedDraft, setDraft, setDraftExtras, type Draft, type DraftExtras } from '@/lib/draft';
 import { supabase } from '@/lib/supabase';
 import { SheetGrab } from '@/components/ui/SheetGrab';
 
 type Recent = { asset: Asset; uri: string; lat: number | null; lng: number | null; time: number | null };
 
+const DRAFT_ROW = 84; // строка черновика 72 + отступ 12
+const MON = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+const pad2 = (n: number) => String(n).padStart(2, '0');
+/** «Исаакиевская пл. · 14 июл, 14:07» */
+const draftLine = (s: { draft: Draft; extras: DraftExtras }) => {
+  const t = s.draft.takenAt;
+  const when = t ? `${t.getDate()} ${MON[t.getMonth()]}${t.getFullYear() === new Date().getFullYear() ? '' : ` ${t.getFullYear()}`}, ${pad2(t.getHours())}:${pad2(t.getMinutes())}` : 'время не указано';
+  return [s.extras.place, when].filter(Boolean).join(' · ');
+};
+
 export default function NewMomentSheet() {
   const { session } = useAuth();
   const insets = useSafeAreaInsets();
   const close = () => router.back();
+  // C2 · есть черновик (12.10): строка «Продолжить черновик» над плитками, лист выше на её высоту
+  const [saved, setSaved] = useState<{ draft: Draft; extras: DraftExtras } | null>(null);
+  useEffect(() => {
+    if (session) loadSavedDraft().then(setSaved);
+  }, [session]);
   const spring = SlideInDown.springify().damping(SHEET_SPRING.damping).stiffness(SHEET_SPRING.stiffness).mass(SHEET_SPRING.mass);
 
   return (
     <Animated.View entering={FadeIn.duration(180)} style={styles.dim}>
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Закрыть" />
-      <Animated.View entering={spring} style={[styles.sheet, { height: (session ? 480 : 460) - 34 + Math.max(insets.bottom, 16) }]}>
+      <Animated.View entering={spring} style={[styles.sheet, { height: (session ? 480 + (saved ? DRAFT_ROW : 0) : 460) - 34 + Math.max(insets.bottom, 16) }]}>
         <Pressable onPress={close} style={styles.grip} hitSlop={{ top: 10, bottom: 6, left: 30, right: 30 }} accessibilityLabel="Закрыть">
           <SheetGrab />
         </Pressable>
-        {session ? <Source /> : <Guest onClose={close} />}
+        {session ? <Source saved={saved} /> : <Guest onClose={close} />}
       </Animated.View>
     </Animated.View>
   );
@@ -69,7 +84,7 @@ function Guest({ onClose }: { onClose: () => void }) {
 }
 
 /** C2: снять сейчас, из галереи или один из недавних снимков */
-function Source() {
+function Source({ saved }: { saved: { draft: Draft; extras: DraftExtras } | null }) {
   const { width } = useWindowDimensions();
   const [recent, setRecent] = useState<Recent[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -94,8 +109,9 @@ function Source() {
     })().catch(() => setRecent([]));
   }, []);
 
-  const go = (d: Draft) => {
+  const go = (d: Draft, extras: DraftExtras | null = null) => {
     setDraft(d);
+    setDraftExtras(extras);
     router.replace('/add');
   };
 
@@ -141,7 +157,21 @@ function Source() {
   return (
     <View>
       <Text style={styles.title}>Новый момент</Text>
-      <View style={styles.tiles}>
+      {saved && (
+        <Pressable
+          onPress={() => go(saved.draft, saved.extras)}
+          style={({ pressed }) => [styles.draft, pressed && { opacity: 0.8 }]}
+          accessibilityLabel={`Продолжить черновик: ${draftLine(saved)}`}
+        >
+          <Image source={{ uri: saved.draft.uri }} style={styles.draftImg} contentFit="cover" />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.draftTitle} numberOfLines={1}>Продолжить черновик</Text>
+            <Text style={styles.draftSub} numberOfLines={1}>{draftLine(saved)}</Text>
+          </View>
+          <Icon name="chevR" size={18} color={D.ink40} />
+        </Pressable>
+      )}
+      <View style={[styles.tiles, saved && { marginTop: 12 }]}>
         <Pressable onPress={() => pick('camera')} style={({ pressed }) => [styles.tile, { backgroundColor: D.sun }, pressed && { opacity: 0.9 }]}>
           <Icon name="camera" size={30} color={D.white} />
           <View style={styles.tileText}>
@@ -207,6 +237,10 @@ const styles = StyleSheet.create({
   // C2
   title: { fontFamily: F.serifItalic, fontSize: 30, lineHeight: 40, color: D.ink },
   tiles: { flexDirection: 'row', gap: 13, marginTop: 16 },
+  draft: { marginTop: 16, height: 72, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 12, paddingRight: 14, borderRadius: 20, backgroundColor: D.paper },
+  draftImg: { width: 48, height: 48, borderRadius: 10, backgroundColor: D.paper2 },
+  draftTitle: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink },
+  draftSub: { fontFamily: F.sans, fontSize: 13, color: D.ink60 },
   tile: { flex: 1, height: 140, borderRadius: 22, padding: 18, justifyContent: 'space-between' },
   tileText: { gap: 4 },
   tileTitle: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.ink },

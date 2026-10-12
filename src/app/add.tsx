@@ -4,7 +4,7 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import MapView, { type Region } from 'react-native-maps';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +12,7 @@ import { Icon } from '@/components/Icon';
 import { TimeWheel } from '@/components/time/TimeWheel';
 import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING } from '@/lib/design';
-import { getDraft, setDraft, type Draft } from '@/lib/draft';
+import { clearSavedDraft, getDraft, saveDraft, setDraft, takeDraftExtras, type Draft } from '@/lib/draft';
 import { requestMapFocus } from '@/lib/focus';
 import { boundsAround, fetchPhotosV2, uploadPhoto } from '@/lib/photos';
 import { reverseAddress } from '@/lib/places';
@@ -34,14 +34,25 @@ const plural = (n: number, one: string, few: string, many: string) => {
 };
 const SLOT = 15;
 
-type View3 = 'confirm' | 'place' | 'time' | 'done';
+type View3 = 'confirm' | 'place' | 'time' | 'done' | 'error';
+// E2 (утверждено 12.10): сеть — со счётчиком попыток, сервер — без; после 3-й попытки — «Сейчас не получается»
+type PubError = { kind: 'network' | 'server'; attempt: number };
+const MAX_TRIES = 3;
+/** Сбой связи (обрыв, нет сети) — в отличие от отказа сервера */
+const isNetwork = (e: any) => {
+  const m = `${e?.name ?? ''} ${e?.message ?? ''} ${e?.originalError?.message ?? ''}`.toLowerCase();
+  return /network|fetch|timed? ?out|offline|connection|internet|abort/.test(m);
+};
 
 export default function PublishScreen() {
   const { session } = useAuth();
   const [draft, setD] = useState<Draft | null>(() => getDraft());
-  const [place, setPlace] = useState<string | null>(null); // название места — в базу (группировка, поиск)
-  const [address, setAddress] = useState<string | null>(null); // адрес с номером дома — в C3, как на карте C4
-  const [caption, setCaption] = useState('');
+  // «Продолжить черновик» (C2): место, адрес и подпись — как были введены
+  const [saved] = useState(() => takeDraftExtras());
+  const [place, setPlace] = useState<string | null>(saved?.place ?? null); // название места — в базу (группировка, поиск)
+  const [address, setAddress] = useState<string | null>(saved?.address ?? null); // адрес с номером дома — в C3, как на карте C4
+  const [caption, setCaption] = useState(saved?.caption ?? '');
+  const [pubError, setPubError] = useState<PubError | null>(null);
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState<{ at: Date; lat: number; lng: number; people: Photo[] } | null>(null);
   // Нет места → сразу C4, нет времени → C5 (заметка C3)
@@ -88,16 +99,34 @@ export default function PublishScreen() {
       const t = draft.takenAt.getTime();
       const near = await fetchPhotosV2(boundsAround(draft.lat, draft.lng, 100), new Date(t - 15 * 60000), new Date(t + 15 * 60000), 300).catch(() => []);
       const people = Array.from(new Map(near.filter((p) => p.user_id !== session.user.id).map((p) => [p.user_id, p])).values());
+      clearSavedDraft(); // опубликовано — черновик больше не нужен
+      setPubError(null);
       setDone({ at: draft.takenAt, lat: draft.lat, lng: draft.lng, people });
       setView('done');
     } catch (e: any) {
-      Alert.alert('Не получилось опубликовать', e?.message ?? 'Проверьте интернет и попробуйте ещё раз.');
+      const kind = isNetwork(e) ? 'network' : 'server';
+      setPubError((prev) => ({ kind, attempt: Math.min(MAX_TRIES, (prev?.kind === kind ? prev.attempt : 0) + 1) }));
+      setView('error');
     } finally {
       setUploading(false);
     }
   };
 
   if (view === 'done' && done) return <Published draft={draft} place={place} address={address} done={done} />;
+  if (view === 'error' && pubError)
+    return (
+      <PublishError
+        draft={draft}
+        error={pubError}
+        busy={uploading}
+        onRetry={publish}
+        onSave={async () => {
+          await saveDraft(draft, { place, address, caption: caption.trim() }).catch(() => {});
+          setDraft(null);
+          router.back();
+        }}
+      />
+    );
   if (view === 'place')
     return (
       <PlacePicker
@@ -431,6 +460,43 @@ function Published({ draft, place, address, done }: { draft: Draft; place: strin
   );
 }
 
+/** E2 · Ошибка публикации: снимок приглушён, карточка с причиной, «Повторить» и «Сохранить черновик» */
+function PublishError({ draft, error, busy, onRetry, onSave }: { draft: Draft; error: PubError; busy: boolean; onRetry: () => void; onSave: () => void }) {
+  const insets = useSafeAreaInsets();
+  const giveUp = error.kind === 'network' && error.attempt >= MAX_TRIES;
+  const title = giveUp ? 'Сейчас не получается' : 'Не удалось опубликовать';
+  const body =
+    error.kind === 'server'
+      ? 'Сервер не принял снимок. Попробуйте ещё раз чуть позже — снимок, место и время сохранены.'
+      : giveUp
+        ? 'Мы трижды пробовали отправить снимок. Сохраните черновик — опубликуете позже из «+».'
+        : 'Связь пропала на середине загрузки. Снимок, место и время сохранены — ничего вводить заново не нужно.';
+  const line = error.kind === 'server' ? 'ОШИБКА СЕРВЕРА' : `ОШИБКА СЕТИ · ПОПЫТКА ${error.attempt} ИЗ ${MAX_TRIES}`;
+  return (
+    <View style={[{ flex: 1, backgroundColor: D.paper }, { paddingTop: insets.top + 68, paddingBottom: Math.max(insets.bottom, 16) + 8, paddingHorizontal: 20 }]}>
+      <StatusBar style="dark" />
+      <Text style={styles.e2Title}>Новый момент</Text>
+      <Image source={{ uri: draft.uri }} style={styles.e2Photo} contentFit="cover" />
+      <View style={styles.e2Card}>
+        <View style={styles.e2Head}>
+          <Icon name="alert" size={26} color={D.sun} />
+          <Text style={styles.e2CardTitle} numberOfLines={1}>{title}</Text>
+        </View>
+        <Text style={styles.e2Body}>{body}</Text>
+        <Text style={styles.e2Line}>{line}</Text>
+      </View>
+      <View style={{ flex: 1 }} />
+      <Pressable onPress={onRetry} disabled={busy} style={({ pressed }) => [styles.button, pressed && { opacity: 0.88 }]}>
+        {busy ? <ActivityIndicator color={D.white} /> : <Text style={styles.buttonText}>Повторить</Text>}
+      </Pressable>
+      {/* 32 pt от кнопки, зона нажатия 45 pt */}
+      <Pressable onPress={onSave} disabled={busy} hitSlop={{ left: 16, right: 16 }} style={styles.e2Save}>
+        <Text style={styles.e2SaveText}>Сохранить черновик</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   round: {
     width: 44,
@@ -445,6 +511,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
   },
   button: { backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
+  // E2
+  e2Title: { fontFamily: F.serifItalic, fontSize: 31, lineHeight: 41, color: D.ink },
+  e2Photo: { marginTop: 11, height: 250, borderRadius: 24, opacity: 0.5, backgroundColor: D.paper2 },
+  e2Card: { marginTop: 26, backgroundColor: D.white, borderWidth: 1.5, borderColor: D.sun, borderRadius: 22, paddingHorizontal: 15, paddingTop: 17, paddingBottom: 24 },
+  e2Head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  e2CardTitle: { flex: 1, fontFamily: F.sansSemi, fontSize: 17, color: D.ink },
+  e2Body: { marginTop: 12, fontFamily: F.sans, fontSize: 14, lineHeight: 20, color: D.ink60 },
+  e2Line: { marginTop: 22, fontFamily: F.mono, fontSize: 10, letterSpacing: 0.6, color: D.ink40 },
+  e2Save: { alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13 },
+  e2SaveText: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink60 },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
   label: { fontFamily: F.mono, fontSize: 11, lineHeight: 15, letterSpacing: 0.88, color: D.ink60 },
   grip: { alignSelf: 'center', height: 26, paddingTop: 9 },
