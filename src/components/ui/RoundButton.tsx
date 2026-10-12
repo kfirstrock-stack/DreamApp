@@ -12,6 +12,7 @@ type Props = {
   tone?: 'light' | 'dark' | 'glass' | 'sun';
   label: string; // для VoiceOver
   style?: ViewStyle;
+  iconColor?: string; // своя краска значка (B1 · «Последние моменты» — оранжевые часы)
 };
 
 const TONES = {
@@ -42,7 +43,7 @@ function useGlass() {
 }
 
 // Круглая кнопка: при нажатии чуть сжимается на пружине
-export function RoundButton({ icon, onPress, size = 44, tone = 'light', label, style }: Props) {
+export function RoundButton({ icon, onPress, size = 44, tone = 'light', label, style, iconColor }: Props) {
   const s = useSharedValue(1);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
   const t = TONES[tone];
@@ -61,11 +62,11 @@ export function RoundButton({ icon, onPress, size = 44, tone = 'light', label, s
       <Animated.View style={anim}>
         {glass ? (
           <GlassView glassEffectStyle="regular" colorScheme="dark" tintColor="rgba(15,14,12,0.45)" isInteractive style={[styles.base, dims]}>
-            <Icon name={icon} size={size * 0.46} color={t.fg} />
+            <Icon name={icon} size={size * 0.46} color={iconColor ?? t.fg} />
           </GlassView>
         ) : (
           <View style={[styles.base, tone === 'light' && lightShadow, dims, { backgroundColor: t.bg }]}>
-            <Icon name={icon} size={size * 0.46} color={t.fg} />
+            <Icon name={icon} size={size * 0.46} color={iconColor ?? t.fg} />
           </View>
         )}
       </Animated.View>

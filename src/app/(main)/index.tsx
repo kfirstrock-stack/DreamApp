@@ -13,6 +13,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { HALO, MomentLayer, PIN, type Pin } from '@/components/map/MomentLayer';
+import { RecentSheet } from '@/components/map/RecentSheet';
 import { StackFan } from '@/components/map/StackFan';
 import { RollingTime } from '@/components/time/RollingTime';
 import { DateSheet } from '@/components/time/DateSheet';
@@ -137,6 +138,7 @@ export default function MapScreen() {
   const [mapStyle, setMapStyle] = useState<MapStyle>(mapStylePref);
   const [layers, setLayers] = useState(false);
   const [dateSheet, setDateSheet] = useState(false); // B3 · «Когда?»
+  const [recent, setRecent] = useState(false); // B1 · «Последние моменты» (12.10)
   const indexSV = useSharedValue(index);
   const now = useSharedValue(index * STEP_MIN + STEP_MIN / 2);
   const [jump, setJump] = useState<{ i: number; key: number } | null>(null);
@@ -647,6 +649,7 @@ export default function MapScreen() {
       {/* «Где я» — справа над шкалой — B1 */}
       {sheet.h > 0 && (
         <View style={[styles.locate, { bottom: sheetBottom + sheet.h + 18 }]} pointerEvents="box-none">
+          <RoundButton icon="clock" iconColor={D.sun} label="Последние моменты" onPress={() => setRecent(true)} />
           <RoundButton icon="locate" label="Где я" onPress={locateMe} />
         </View>
       )}
@@ -847,6 +850,18 @@ export default function MapScreen() {
         </Animated.View>
       )}
 
+      {/* B1 · «Последние моменты»: туда и в то время */}
+      {recent && (
+        <RecentSheet
+          onClose={() => setRecent(false)}
+          onPick={(m) => {
+            setRecent(false);
+            flyTo(m.lat, m.lng);
+            goTo(new Date(m.bucket));
+          }}
+        />
+      )}
+
       {/* B3 · выбор даты и времени */}
       {dateSheet && (
         <DateSheet
@@ -899,7 +914,7 @@ const styles = StyleSheet.create({
     shadowColor: '#17120D', shadowOpacity: 0.12, shadowRadius: 9, shadowOffset: { width: 0, height: 6 }, elevation: 6,
   },
   searchText: { flex: 1, fontFamily: F.sansMedium, fontSize: 15, color: D.ink },
-  locate: { position: 'absolute', right: 16, zIndex: 1000, elevation: 30 },
+  locate: { position: 'absolute', right: 16, gap: 12, zIndex: 1000, elevation: 30 },
   summary: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, marginTop: 8, marginBottom: 6 },
   summaryAvas: { flexDirection: 'row' },
   summaryAva: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: D.white, margin: -2 },

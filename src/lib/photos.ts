@@ -224,3 +224,17 @@ export async function hideAuthor(userId: string, authorId: string) {
   const { error } = await supabase.from('hidden_authors').insert({ user_id: userId, hidden_user_id: authorId });
   if (error && error.code !== '23505') throw error;
 }
+
+/** «Последние моменты» (B1, 12.10): снимки, собранные по месту (~150 м) и 15-минутному интервалу. Ваш последний — первым */
+export type RecentMoment = { lat: number; lng: number; bucket: string; photo_count: number; place_name: string | null; cover_path: string; mine: boolean };
+export async function fetchRecentMoments(limit = 6): Promise<RecentMoment[]> {
+  const [all, mine] = await Promise.all([
+    supabase.rpc('recent_moments', { only_mine: false, max_rows: limit + 1 }),
+    supabase.rpc('recent_moments', { only_mine: true, max_rows: 1 }),
+  ]);
+  if (all.error) throw all.error;
+  const key = (m: RecentMoment) => `${m.bucket}|${m.lat.toFixed(3)}|${m.lng.toFixed(3)}`;
+  const my = ((mine.data ?? []) as RecentMoment[])[0];
+  const rest = ((all.data ?? []) as RecentMoment[]).filter((m) => !my || key(m) !== key(my));
+  return (my ? [my, ...rest] : rest).slice(0, limit);
+}
