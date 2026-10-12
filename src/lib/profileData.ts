@@ -129,6 +129,9 @@ export async function deleteAccount(uid: string) {
 }
 
 // ── форматирование ──
+/** «@NICK · ГОРОД», только ник или только город; пусто — '' */
+export const nickLine = (p: Pick<Profile, 'username' | 'city'> | null | undefined) =>
+  [p?.username ? `@${p.username}` : '', p?.city ?? ''].filter(Boolean).join(' · ').toUpperCase();
 const MON = ['ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЯ', 'ИЮН', 'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК'];
 const MON_LOW = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 const pad = (n: number) => String(n).padStart(2, '0');

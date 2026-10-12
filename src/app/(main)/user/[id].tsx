@@ -12,7 +12,7 @@ import { Stagger } from '@/components/ui/Stagger';
 import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING } from '@/lib/design';
 import { hideAuthor, photoSource } from '@/lib/photos';
-import { compact, dayLower, fetchAuthorPhotos, fetchMatches, fetchProfile, fetchStats, monthYearUpper, plural, type Match, type Stats } from '@/lib/profileData';
+import { compact, dayLower, fetchAuthorPhotos, fetchMatches, fetchProfile, fetchStats, monthYearUpper, nickLine, plural, type Match, type Stats } from '@/lib/profileData';
 import type { Photo, Profile } from '@/lib/types';
 
 export default function UserScreen() {
@@ -69,9 +69,12 @@ export default function UserScreen() {
             <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
               {name}
             </Text>
-            <Text style={styles.nick} numberOfLines={1}>
-              {[p?.username ? `@${p.username}` : '', p?.city ?? ''].filter(Boolean).join(' · ').toUpperCase() || ' '}
-            </Text>
+            {/* нет ни ника, ни города — строку не показываем (D3 · без ника и города, 12.10) */}
+            {nickLine(p) ? (
+              <Text style={styles.nick} numberOfLines={1}>
+                {nickLine(p)}
+              </Text>
+            ) : null}
             <Text style={styles.since}>{p?.created_at ? `В DREAMAPP С ${monthYearUpper(new Date(p.created_at))}` : ' '}</Text>
           </View>
         </View>

@@ -14,7 +14,7 @@ import { D, F } from '@/lib/design';
 import { requestMapFocus } from '@/lib/focus';
 import { photoSource } from '@/lib/photos';
 import {
-  compact, dative, dayUpper, fetchAuthorPhotos, fetchMatches, fetchStats, hm, matchKey, monthYearUpper, plural, type Match, type Stats,
+  compact, dative, dayUpper, fetchAuthorPhotos, fetchMatches, fetchStats, hm, matchKey, monthYearUpper, nickLine, plural, type Match, type Stats,
 } from '@/lib/profileData';
 import { supabase } from '@/lib/supabase';
 import type { Photo } from '@/lib/types';
@@ -78,9 +78,12 @@ export default function ProfileScreen() {
               {name}
             </Text>
             {/* 12.10: как у всех — ник · город, ниже «В DreamApp с …» */}
-            <Text style={styles.nick} numberOfLines={1}>
-              {[profile?.username ? `@${profile.username}` : '', profile?.city ?? ''].filter(Boolean).join(' · ').toUpperCase() || ' '}
-            </Text>
+            {/* нет ни ника, ни города — строку не показываем, «В DreamApp с …» встаёт под имя (12.10) */}
+            {nickLine(profile) ? (
+              <Text style={styles.nick} numberOfLines={1}>
+                {nickLine(profile)}
+              </Text>
+            ) : null}
             <Text style={styles.since}>{since ? `В DREAMAPP С ${monthYearUpper(since)}` : ' '}</Text>
           </View>
         </Pressable>
