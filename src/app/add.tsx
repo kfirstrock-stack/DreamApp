@@ -64,10 +64,15 @@ export default function PublishScreen() {
   }, [draft]);
   useEffect(() => {
     if (draft?.lat == null || draft.lng == null) return;
+    let off = false;
     reverseAddress(draft.lat, draft.lng).then((a) => {
+      if (off) return;
       setPlace(a.place);
       setAddress(a.address);
     });
+    return () => {
+      off = true;
+    };
   }, [draft?.lat, draft?.lng]);
   if (!draft) return null;
 
@@ -135,8 +140,9 @@ export default function PublishScreen() {
         onCancel={() => (draft.lat == null ? router.back() : setView('confirm'))}
         onPick={(lat, lng, a) => {
           update({ lat, lng, locationSource: 'manual' });
-          if (a.place) setPlace(a.place);
-          if (a.address) setAddress(a.address);
+          // 12.10: раньше при быстром нажатии оставался адрес прежней точки («Хоккейная, 39» у Исаакиевского)
+          setPlace(a.place);
+          setAddress(a.address);
           setView(draft.takenAt == null ? 'time' : 'confirm');
         }}
       />
@@ -156,7 +162,7 @@ export default function PublishScreen() {
       draft={draft}
       place={place}
       address={address}
-      found={found.current}
+      found={found.current && draft.locationSource !== 'manual' && draft.timeSource !== 'manual'}
       caption={caption}
       setCaption={setCaption}
       uploading={uploading}
@@ -255,10 +261,12 @@ function PlacePicker({ draft, noGeo, onCancel, onPick }: { draft: Draft; noGeo: 
   const map = useRef<MapView>(null);
   const start: Region = { latitude: draft.lat ?? 59.9341, longitude: draft.lng ?? 30.3061, latitudeDelta: 0.006, longitudeDelta: 0.006 };
   const [at, setAt] = useState({ lat: start.latitude, lng: start.longitude });
-  const [addr, setAddr] = useState<{ address: string | null; place: string | null }>({ address: null, place: null });
+  // адрес помнит, для какой точки он посчитан: пока карту двигают, старый адрес не выдаём за новый
+  const [addr, setAddr] = useState<{ address: string | null; place: string | null; lat?: number; lng?: number }>({ address: null, place: null });
+  const fresh = addr.lat === at.lat && addr.lng === at.lng;
   useEffect(() => {
     let off = false;
-    const t = setTimeout(() => reverseAddress(at.lat, at.lng).then((a) => !off && setAddr(a)), 250);
+    const t = setTimeout(() => reverseAddress(at.lat, at.lng).then((a) => !off && setAddr({ ...a, lat: at.lat, lng: at.lng })), 250);
     return () => {
       off = true;
       clearTimeout(t);
@@ -316,12 +324,12 @@ function PlacePicker({ draft, noGeo, onCancel, onPick }: { draft: Draft; noGeo: 
         <View style={styles.addressCard}>
           <Text style={styles.addrLabel}>АДРЕС</Text>
           <Text style={styles.addrTitle} numberOfLines={1}>
-            {addr.address ?? '…'}
+            {fresh ? (addr.address ?? '—') : '…'}
           </Text>
           <Text style={styles.addrCoords}>
             {coords(at.lat, at.lng)} · {coordsLng(at.lng)}
           </Text>
-          <Pressable onPress={() => onPick(at.lat, at.lng, addr)} style={({ pressed }) => [styles.button, { marginTop: 24 }, pressed && { opacity: 0.88 }]}>
+          <Pressable onPress={() => onPick(at.lat, at.lng, fresh ? addr : { address: null, place: null })} style={({ pressed }) => [styles.button, { marginTop: 24 }, pressed && { opacity: 0.88 }]}>
             <Text style={styles.buttonText}>Снимок сделан здесь</Text>
           </Pressable>
           <Pressable onPress={onCancel} hitSlop={10} style={{ alignSelf: 'center', marginTop: 18 }}>
