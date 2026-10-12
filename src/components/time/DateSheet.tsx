@@ -13,12 +13,12 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
 import { Icon } from '@/components/Icon';
 import { D, F, SHEET_SPRING } from '@/lib/design';
 import { fetchTimeBuckets } from '@/lib/photos';
 import type { Step } from '@/lib/timeSteps';
 import type { Bounds } from '@/lib/types';
+import { SheetGrab } from '@/components/ui/SheetGrab';
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const WEEK = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
@@ -125,9 +125,7 @@ export function DateSheet({ step, moment, bounds, onClose, onPick }: Props) {
       >
         {/* ручка — та же дуга, что у шкалы; тап закрывает */}
         <Pressable onPress={onClose} style={styles.grip} hitSlop={{ top: 10, bottom: 6, left: 30, right: 30 }} accessibilityLabel="Закрыть">
-          <Svg width={25} height={8}>
-            <Path d="M 1.5 1.5 C 8.5 5 16.5 5 23.5 1.5" stroke="rgba(22,19,15,0.28)" strokeWidth={2} strokeLinecap="round" fill="none" />
-          </Svg>
+          <SheetGrab />
         </Pressable>
         <Text style={styles.title}>Когда?</Text>
 

@@ -4,10 +4,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
 import { scheduleOnRN } from 'react-native-worklets';
 import { Icon } from '@/components/Icon';
 import { D, F, SHEET_SPRING } from '@/lib/design';
+import { SheetGrab } from '@/components/ui/SheetGrab';
 
 export function PhotoSource({ onPick, onClose }: { onPick: (src: 'camera' | 'gallery') => void; onClose: () => void }) {
   const insets = useSafeAreaInsets();
@@ -29,9 +29,7 @@ export function PhotoSource({ onPick, onClose }: { onPick: (src: 'camera' | 'gal
       <GestureDetector gesture={pan}>
         <Animated.View entering={spring} exiting={SlideOutDown.duration(200)} style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 10 }, st]}>
           <Pressable onPress={onClose} style={styles.grip} hitSlop={{ top: 10, bottom: 6, left: 30, right: 30 }} accessibilityLabel="Закрыть">
-            <Svg width={25} height={8}>
-              <Path d="M 1.5 1.5 C 8.5 5 16.5 5 23.5 1.5" stroke="rgba(22,19,15,0.28)" strokeWidth={2} strokeLinecap="round" fill="none" />
-            </Svg>
+            <SheetGrab />
           </Pressable>
           <Text style={styles.sheetTitle}>Фото профиля</Text>
           <View style={styles.tiles}>

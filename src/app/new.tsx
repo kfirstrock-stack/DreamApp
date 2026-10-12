@@ -8,12 +8,12 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
 import { Icon } from '@/components/Icon';
 import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING } from '@/lib/design';
 import { draftFromPicker, setDraft, type Draft } from '@/lib/draft';
 import { supabase } from '@/lib/supabase';
+import { SheetGrab } from '@/components/ui/SheetGrab';
 
 type Recent = { asset: Asset; uri: string; lat: number | null; lng: number | null; time: number | null };
 
@@ -28,9 +28,7 @@ export default function NewMomentSheet() {
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Закрыть" />
       <Animated.View entering={spring} style={[styles.sheet, { height: (session ? 480 : 460) - 34 + Math.max(insets.bottom, 16) }]}>
         <Pressable onPress={close} style={styles.grip} hitSlop={{ top: 10, bottom: 6, left: 30, right: 30 }} accessibilityLabel="Закрыть">
-          <Svg width={25} height={8}>
-            <Path d="M 1.5 1.5 C 8.5 5 16.5 5 23.5 1.5" stroke="rgba(22,19,15,0.28)" strokeWidth={2} strokeLinecap="round" fill="none" />
-          </Svg>
+          <SheetGrab />
         </Pressable>
         {session ? <Source /> : <Guest onClose={close} />}
       </Animated.View>

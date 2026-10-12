@@ -21,6 +21,7 @@ import { ScaleGrip, type ScaleMode } from '@/components/time/ScaleGrip';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
 import { PillButton } from '@/components/ui/PillButton';
 import { RoundButton } from '@/components/ui/RoundButton';
+import { SheetGrab } from '@/components/ui/SheetGrab';
 import { TAB_BAR_SPACE, TabBar } from '@/components/ui/TabBar';
 import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING, STEP_MIN, softShadow } from '@/lib/design';
@@ -836,7 +837,7 @@ export default function MapScreen() {
             exiting={SlideOutDown.duration(200)}
             style={[styles.layersSheet, { paddingBottom: Math.max(insets.bottom, 16) + 24 }]}
           >
-            <View style={styles.grab} />
+            <SheetGrab />
             <Text style={styles.layersTitle}>Вид карты</Text>
             <View style={styles.tiles}>
               {MAP_STYLES.map((m) => (
@@ -958,7 +959,6 @@ const styles = StyleSheet.create({
   stepRowOn: { fontFamily: F.sansSemi, color: D.sun },
   dim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(22,19,15,0.45)', justifyContent: 'flex-end', zIndex: 3000, elevation: 50 },
   layersSheet: { backgroundColor: D.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10, paddingHorizontal: 24, gap: 14 },
-  grab: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: D.line },
   layersTitle: { fontFamily: F.serif, fontSize: 24, color: D.ink },
   tiles: { flexDirection: 'row', gap: 12 },
   tile: { flex: 1, alignItems: 'center', gap: 8 },

@@ -3,7 +3,6 @@ import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedProps,
-  useAnimatedStyle,
   useSharedValue,
   withDelay,
   withSequence,
@@ -29,7 +28,7 @@ type Props = {
 };
 
 // Ручка шкалы (вариант D): белый язычок над карточкой, внутри — мягкая дуга.
-// Полная — дуга вниз, компактная — ровная чёрточка с точками, свёрнутая — дуга вверх.
+// Полная — дуга вниз, компактная — ровная черта, свёрнутая — дуга вверх. Толщина 5 pt (утверждено 12.10).
 export function ScaleGrip({ mode, onTap, onSwipe, nudge, drag: dy }: Props) {
   const t = useSharedValue(T[mode]);
   useEffect(() => {
@@ -44,9 +43,8 @@ export function ScaleGrip({ mode, onTap, onSwipe, nudge, drag: dy }: Props) {
   const arcProps = useAnimatedProps(() => {
     const a = 1.75 * (1 - t.value);
     const b = 1.75 * (1 + t.value);
-    return { d: `M 1.5 ${a + 1.5} C 8.5 ${b + 1.5} 16.5 ${b + 1.5} 23.5 ${a + 1.5}` };
+    return { d: `M 2.5 ${a + 2.5} C 9.5 ${b + 2.5} 17.5 ${b + 2.5} 24.5 ${a + 2.5}` };
   });
-  const dots = useAnimatedStyle(() => ({ opacity: Math.max(0, 1 - Math.abs(t.value) * 1.6) }));
   const tick = () => Haptics.selectionAsync().catch(() => {});
 
   // тап срабатывает сразу при касании-отпускании, свайп — как только палец сдвинулся
@@ -83,11 +81,9 @@ export function ScaleGrip({ mode, onTap, onSwipe, nudge, drag: dy }: Props) {
           <Svg width={60} height={14} style={styles.tab}>
             <Path d="M 0 14 C 10 14 12 0 26 0 L 34 0 C 48 0 50 14 60 14 Z" fill="#FFFFFF" />
           </Svg>
-          <Svg width={25} height={8} style={styles.arc}>
-            <AnimatedPath animatedProps={arcProps} stroke="rgba(22,19,15,0.28)" strokeWidth={2} strokeLinecap="round" fill="none" />
+          <Svg width={27} height={10} style={styles.arc}>
+            <AnimatedPath animatedProps={arcProps} stroke="rgba(22,19,15,0.15)" strokeWidth={5} strokeLinecap="round" fill="none" />
           </Svg>
-          <Animated.View style={[styles.dot, { top: -6.5 }, dots]} />
-          <Animated.View style={[styles.dot, { top: 6.5 }, dots]} />
         </View>
       </View>
     </GestureDetector>
@@ -99,6 +95,5 @@ const styles = StyleSheet.create({
   hit: { position: 'absolute', top: -22, alignSelf: 'center', width: 120, height: 40, alignItems: 'center', zIndex: 10 },
   tabWrap: { width: 60, height: 22, marginTop: 9, alignItems: 'center' },
   tab: { position: 'absolute', top: 0, shadowColor: '#17120D', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: -2 } },
-  arc: { position: 'absolute', top: 7.5 },
-  dot: { position: 'absolute', alignSelf: 'center', marginTop: 11 - 1.25, width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: 'rgba(22,19,15,0.28)' },
+  arc: { position: 'absolute', top: 6.5 },
 });

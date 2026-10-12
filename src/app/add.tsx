@@ -8,7 +8,6 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, Sc
 import MapView, { type Region } from 'react-native-maps';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
 import { Icon } from '@/components/Icon';
 import { TimeWheel } from '@/components/time/TimeWheel';
 import { useAuth } from '@/lib/auth';
@@ -18,6 +17,7 @@ import { requestMapFocus } from '@/lib/focus';
 import { boundsAround, fetchPhotosV2, uploadPhoto } from '@/lib/photos';
 import { reverseAddress } from '@/lib/places';
 import type { Photo } from '@/lib/types';
+import { SheetGrab } from '@/components/ui/SheetGrab';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const WD = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
@@ -328,9 +328,7 @@ function TimePicker({ draft, onDone }: { draft: Draft; onDone: (at: Date) => voi
         style={[styles.timeSheet, { paddingBottom: Math.max(insets.bottom, 16) + 24 }]}
       >
         <View style={styles.grip}>
-          <Svg width={25} height={8}>
-            <Path d="M 1.5 1.5 C 8.5 5 16.5 5 23.5 1.5" stroke="rgba(22,19,15,0.28)" strokeWidth={2} strokeLinecap="round" fill="none" />
-          </Svg>
+          <SheetGrab />
         </View>
         <Text style={styles.c5Title}>Когда сделан снимок?</Text>
         {draft.takenAt == null && (

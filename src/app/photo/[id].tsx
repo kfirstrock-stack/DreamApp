@@ -31,6 +31,7 @@ import {
   boundsAround, cachedPhoto, deletePhoto, fetchPhotoFull, fetchPhotosV2, hideAuthor, photoSource, reportPhoto, setLike, type ReportReason,
 } from '@/lib/photos';
 import type { Photo } from '@/lib/types';
+import { SheetGrab } from '@/components/ui/SheetGrab';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const MON = ['ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЯ', 'ИЮН', 'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК'];
@@ -355,7 +356,7 @@ export default function PhotoScreen() {
     const t = 2 * openness() - 1;
     const a = 1.75 * (1 - t);
     const b = 1.75 * (1 + t);
-    return { d: `M 1.5 ${a + 1.5} C 8.5 ${b + 1.5} 16.5 ${b + 1.5} 23.5 ${a + 1.5}` };
+    return { d: `M 2.5 ${a + 2.5} C 9.5 ${b + 2.5} 17.5 ${b + 2.5} 24.5 ${a + 2.5}` }; // дуга 22 pt, толщина 5 (12.10)
   });
 
   if (failed === 'error' && !photo) {
@@ -516,8 +517,8 @@ export default function PhotoScreen() {
               }}
             >
               <Pressable onPress={toggleSheet} style={styles.grip} hitSlop={{ top: 10, bottom: 6 }} accessibilityRole="button" accessibilityLabel={open ? 'Свернуть подробности' : 'Показать подробности'}>
-                <Svg width={25} height={8}>
-                  <AnimatedPath animatedProps={gripArc} stroke="rgba(244,239,230,0.55)" strokeWidth={2} strokeLinecap="round" fill="none" />
+                <Svg width={27} height={10}>
+                  <AnimatedPath animatedProps={gripArc} stroke="rgba(244,239,230,0.55)" strokeWidth={5} strokeLinecap="round" fill="none" />
                 </Svg>
               </Pressable>
               <View style={styles.authorRow}>
@@ -601,7 +602,7 @@ export default function PhotoScreen() {
         <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(150)} style={styles.backdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenu(null)} />
           <Animated.View entering={SlideInDown.springify().damping(SHEET_SPRING.damping).stiffness(SHEET_SPRING.stiffness).mass(SHEET_SPRING.mass)} exiting={SlideOutDown.duration(220)} style={[styles.menu, { paddingBottom: insets.bottom + 16 }]}>
-            <View style={styles.handle} />
+            <SheetGrab />
             {menu === 'actions' ? (
               <>
                 <MenuRow
@@ -714,7 +715,7 @@ const styles = StyleSheet.create({
   goneText: { fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: D.paper, opacity: 0.6, marginTop: 10, textAlign: 'center' },
   backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,14,12,0.55)', justifyContent: 'flex-end' },
   menu: { backgroundColor: D.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 10 },
-  handle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: D.line, marginBottom: 16 },
+
   menuTitle: { fontFamily: F.serif, fontSize: 24, color: D.ink, marginBottom: 8 },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 15 },
   menuText: { flex: 1, fontFamily: F.sans, fontSize: 17, color: D.ink },

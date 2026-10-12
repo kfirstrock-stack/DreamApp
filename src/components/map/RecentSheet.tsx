@@ -8,6 +8,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } fr
 import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { SheetGrab } from '@/components/ui/SheetGrab';
 import { D, F, SHEET_SPRING } from '@/lib/design';
 import { fetchRecentMoments, photoSource, type RecentMoment } from '@/lib/photos';
 
@@ -64,7 +65,7 @@ export function RecentSheet({ onClose, onPick }: { onClose: () => void; onPick: 
       </Animated.View>
       <GestureDetector gesture={pan}>
         <Animated.View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 18, maxHeight: height - insets.top - 40 }, sheetStyle]}>
-          <View style={styles.grab} />
+          <SheetGrab />
           <Text style={styles.title}>Последние моменты</Text>
           <Text style={styles.intro}>Где снимали недавно — нажмите, чтобы перенестись туда и в то время.</Text>
           {list == null ? (
@@ -115,7 +116,6 @@ const styles = StyleSheet.create({
   wrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-end', zIndex: 3000, elevation: 50 },
   dim: { backgroundColor: 'rgba(22,19,15,0.35)' },
   sheet: { backgroundColor: D.paper, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10, paddingHorizontal: 24 },
-  grab: { alignSelf: 'center', width: 36, height: 5, borderRadius: 3, backgroundColor: 'rgba(22,19,15,0.15)' },
   title: { marginTop: 18, fontFamily: F.serif, fontSize: 28, color: D.ink },
   intro: { marginTop: 6, fontFamily: F.sans, fontSize: 14, lineHeight: 20, color: D.ink60 },
   wait: { height: 120, alignItems: 'center', justifyContent: 'center' },
