@@ -18,6 +18,7 @@ import { boundsAround, fetchPhotosV2, newPublishKey, uploadPhoto, type PublishKe
 import { reverseAddress } from '@/lib/places';
 import type { Photo } from '@/lib/types';
 import { SheetGrab } from '@/components/ui/SheetGrab';
+import { PlaceSearch } from '@/components/place/PlaceSearch';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const WD = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
@@ -267,6 +268,7 @@ function PlacePicker({ draft, noGeo, onCancel, onPick }: { draft: Draft; noGeo: 
   // адрес помнит, для какой точки он посчитан: пока карту двигают, старый адрес не выдаём за новый
   const [addr, setAddr] = useState<{ address: string | null; place: string | null; lat?: number; lng?: number }>({ address: null, place: null });
   const fresh = addr.lat === at.lat && addr.lng === at.lng;
+  const [searching, setSearching] = useState(false); // C4 · поиск по названию (12.10)
   useEffect(() => {
     let off = false;
     const t = setTimeout(() => reverseAddress(at.lat, at.lng).then((a) => !off && setAddr({ ...a, lat: at.lat, lng: at.lng })), 250);
@@ -317,7 +319,11 @@ function PlacePicker({ draft, noGeo, onCancel, onPick }: { draft: Draft; noGeo: 
         </Pressable>
         <View style={styles.hint}>
           <Text style={styles.hintTitle}>Где сделан снимок?</Text>
-          <Text style={styles.hintText}>{noGeo ? 'В снимке нет геоданных — сдвиньте карту' : 'Сдвиньте карту, чтобы уточнить место'}</Text>
+          <Text style={styles.hintText}>Найдите по названию или сдвиньте карту</Text>
+          <Pressable onPress={() => setSearching(true)} style={({ pressed }) => [styles.c4Search, pressed && { opacity: 0.7 }]} accessibilityLabel="Найти место или адрес">
+            <Icon name="search" size={18} color={D.ink60} />
+            <Text style={styles.c4SearchText}>Найти место или адрес</Text>
+          </Pressable>
         </View>
       </View>
       <View style={[styles.c4Bottom, { bottom: Math.max(insets.bottom, 12) + 28 }]}>
@@ -340,6 +346,16 @@ function PlacePicker({ draft, noGeo, onCancel, onPick }: { draft: Draft; noGeo: 
           </Pressable>
         </View>
       </View>
+      {searching && (
+        <PlaceSearch
+          near={at}
+          onCancel={() => setSearching(false)}
+          onPick={(p) => {
+            setSearching(false);
+            map.current?.animateToRegion({ ...start, latitude: p.lat, longitude: p.lng }, 500);
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -615,6 +631,8 @@ const styles = StyleSheet.create({
   },
   hintTitle: { fontFamily: F.sansSemi, fontSize: 15, lineHeight: 19, color: D.ink },
   hintText: { marginTop: 5, fontFamily: F.sans, fontSize: 13, lineHeight: 17, color: D.ink60 },
+  c4Search: { marginTop: 10, height: 42, borderRadius: 21, backgroundColor: D.paper, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14 },
+  c4SearchText: { fontFamily: F.sansMedium, fontSize: 15, color: D.ink60 },
   c4Bottom: { position: 'absolute', left: 12, right: 12 },
   addressCard: {
     backgroundColor: D.white,

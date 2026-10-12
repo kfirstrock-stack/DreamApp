@@ -13,6 +13,27 @@ import { leaveAuth, markOnboarded } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
 
 const CODE = 8;
+// №2 (12.10): опечатка в домене частой почты — подсказываем «Возможно, …@gmail.com?»
+const DOMAINS = ['gmail.com', 'mail.ru', 'yandex.ru', 'ya.ru', 'icloud.com', 'bk.ru', 'inbox.ru', 'list.ru', 'rambler.ru', 'outlook.com', 'hotmail.com', 'yahoo.com', 'me.com'];
+// настоящие домены, похожие на частые, — им ничего не подсказываем
+const KNOWN = ['mail.com', 'gmx.com', 'gmx.de', 'ymail.com', 'yandex.com', 'yandex.by', 'yandex.kz', 'live.com', 'aol.com', 'mac.com', 'proton.me', 'protonmail.com', 'internet.ru'];
+const lev = (a: string, b: string) => {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+};
+function suggestEmail(raw: string): string | null {
+  const m = raw.trim().toLowerCase().match(/^([^@\s]+)@([^@\s]+)$/);
+  if (!m || DOMAINS.includes(m[2]) || KNOWN.includes(m[2])) return null;
+  let best: string | null = null, bd = 3;
+  for (const k of DOMAINS) {
+    const x = lev(m[2], k);
+    if (x < bd) (bd = x), (best = k);
+  }
+  return best && bd <= 2 ? `${m[1]}@${best}` : null;
+}
 const RESEND = 60;
 const ART = {
   left: require('../../assets/onboarding/a4-left.png'),
@@ -238,9 +259,23 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter, returning, onO
               onSubmitEditing={onSend}
               style={styles.input}
             />
+            {/* №1 (12.10): крестик очистки — только когда в поле что-то есть */}
+            {email.length > 0 && (
+              <Pressable onPress={() => setEmail('')} hitSlop={12} accessibilityLabel="Очистить почту">
+                <Icon name="close" size={20} color="rgba(244,239,230,0.6)" />
+              </Pressable>
+            )}
           </View>
           )}
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? (
+            <Text style={styles.error}>{error}</Text>
+          ) : !returning && suggestEmail(email) ? (
+            <Pressable onPress={() => setEmail(suggestEmail(email)!)} hitSlop={8} accessibilityLabel={`Исправить на ${suggestEmail(email)}`}>
+              <Text style={styles.suggest}>
+                Возможно, <Text style={styles.suggestAddr}>{suggestEmail(email)}</Text>?
+              </Text>
+            </Pressable>
+          ) : null}
           </Animated.View>
           <Animated.View style={t5}>
             <Pressable onPress={onSend} disabled={busy} style={({ pressed }) => [styles.button, { marginTop: 12 }, pressed && { opacity: 0.88 }]}>
@@ -415,6 +450,8 @@ const styles = StyleSheet.create({
   },
   input: { flex: 1, height: '100%', fontFamily: F.sans, fontSize: 16, color: D.paper, padding: 0 },
   error: { marginTop: 8, fontFamily: F.sans, fontSize: 13, color: D.sun },
+  suggest: { marginTop: 10, marginLeft: 4, fontFamily: F.sans, fontSize: 14, color: 'rgba(244,239,230,0.7)' },
+  suggestAddr: { fontFamily: F.sansSemi, color: D.sun },
   button: { backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
   guest: { fontFamily: F.sansSemi, fontSize: 15, color: 'rgba(244,239,230,0.7)' },
