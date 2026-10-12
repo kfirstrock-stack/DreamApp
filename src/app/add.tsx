@@ -36,7 +36,7 @@ const SLOT = 15;
 
 type View3 = 'confirm' | 'place' | 'time' | 'done' | 'error';
 // E2 (утверждено 12.10): сеть — со счётчиком попыток, сервер — без; после 3-й попытки — «Сейчас не получается»
-type PubError = { kind: 'network' | 'server'; attempt: number };
+type PubError = { kind: 'network' | 'server'; attempt: number; detail?: string };
 const MAX_TRIES = 3;
 /** Сбой связи (обрыв, нет сети) — в отличие от отказа сервера */
 const isNetwork = (e: any) => {
@@ -110,7 +110,7 @@ export default function PublishScreen() {
       setView('done');
     } catch (e: any) {
       const kind = isNetwork(e) ? 'network' : 'server';
-      setPubError((prev) => ({ kind, attempt: Math.min(MAX_TRIES, (prev?.kind === kind ? prev.attempt : 0) + 1) }));
+      setPubError((prev) => ({ kind, attempt: Math.min(MAX_TRIES, (prev?.kind === kind ? prev.attempt : 0) + 1), detail: `${e?.name ?? ''}: ${e?.message ?? String(e)}${e?.code ? ` [${e.code}]` : ''}` }));
       setView('error');
     } finally {
       setUploading(false);
@@ -492,6 +492,7 @@ function PublishError({ draft, error, busy, onRetry, onSave }: { draft: Draft; e
         </View>
         <Text style={styles.e2Body}>{body}</Text>
         <Text style={styles.e2Line}>{line}</Text>
+        {__DEV__ && error.detail ? <Text style={[styles.e2Line, { marginTop: 6, color: D.sun }]} selectable>{error.detail}</Text> : null}
       </View>
       <View style={{ flex: 1 }} />
       <Pressable onPress={onRetry} disabled={busy} style={({ pressed }) => [styles.button, pressed && { opacity: 0.88 }]}>
