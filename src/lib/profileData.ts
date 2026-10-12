@@ -36,6 +36,7 @@ export type Match = {
 // Последний загруженный список — чтобы D2 открывался мгновенно из D1
 let lastMatches: Match[] = [];
 export const matchKey = (m: Match) => `${m.my_photo_id}:${m.other_photo_id}`;
+export const cachedMatches = () => lastMatches;
 export const cachedMatch = (key: string) => lastMatches.find((m) => matchKey(m) === key) ?? null;
 
 /** Совпадения: чужое фото не дальше ~100 м и ±15 минут от вашего. Свежие — первыми, по одному на каждое ваше фото */

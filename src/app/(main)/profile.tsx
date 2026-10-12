@@ -22,6 +22,8 @@ import type { Photo } from '@/lib/types';
 const GAP = 10;
 // в макете 393 pt: поля по 20, карточка 338 — справа выглядывает следующая
 
+const SHOWN = 5; // совпадений в карусели D1
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -98,7 +100,15 @@ export default function ProfileScreen() {
         </Stagger>
 
         <Stagger i={2}>
-        <Text style={[styles.label, { marginTop: 29 }]}>СОВПАДЕНИЯ</Text>
+        {/* 12.10: в карусели 5 последних (подтверждённые первыми), остальные — «Все N →» (D10) */}
+        <View style={[styles.momentsHead, { marginTop: 29 }]}>
+          <Text style={styles.label}>СОВПАДЕНИЯ</Text>
+          {matches && matches.length > SHOWN && (
+            <Pressable onPress={() => router.push('/matches')} hitSlop={12} accessibilityLabel={`Все совпадения: ${matches.length}`}>
+              <Text style={styles.link}>Все {matches.length} →</Text>
+            </Pressable>
+          )}
+        </View>
         {matches && matches.length > 0 ? (
           <ScrollView
             horizontal
@@ -108,7 +118,7 @@ export default function ProfileScreen() {
             contentContainerStyle={{ paddingHorizontal: 20, gap: GAP }}
             style={{ marginTop: 9 }}
           >
-            {matches.map((m) => (
+            {matches.slice(0, SHOWN).map((m) => (
               <MatchCard key={matchKey(m)} m={m} w={matches.length === 1 ? content : cardW} />
             ))}
           </ScrollView>
