@@ -109,36 +109,53 @@ export type NewPhoto = {
   caption: string | null;
 };
 
-export async function uploadPhoto(userId: string, p: NewPhoto): Promise<string> {
-  const ext = p.mimeType.includes('png') ? 'png' : p.mimeType.includes('heic') ? 'heic' : 'jpg';
-  const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const up = await supabase.storage.from('photos').upload(path, decode(p.base64), {
-    contentType: p.mimeType,
-    upsert: false,
+/** Одна публикация = один id момента и один путь файла на все повторы (12.10).
+ *  Если ответ сервера потерялся, повтор не создаёт дубль и не удаляет уже записанный снимок. */
+export type PublishKey = { id: string; path: string; uploaded: boolean };
+const uuid4 = () =>
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
   });
-  if (up.error) throw up.error;
+export function newPublishKey(userId: string, mimeType: string): PublishKey {
+  const ext = mimeType.includes('png') ? 'png' : mimeType.includes('heic') ? 'heic' : 'jpg';
+  return { id: uuid4(), path: `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`, uploaded: false };
+}
+/** Обрыв связи: запрос мог дойти до сервера, просто ответ не вернулся */
+const netError = (e: any) => /network|fetch|timed? ?out|offline|connection|abort/i.test(`${e?.name ?? ''} ${e?.message ?? ''}`);
 
-  const { data, error } = await supabase
-    .from('photos')
-    .insert({
-      user_id: userId,
-      storage_path: path,
-      width: p.width,
-      height: p.height,
-      taken_at: p.takenAt.toISOString(),
-      lat: p.lat,
-      lng: p.lng,
-      location_source: p.locationSource,
-      place_name: p.placeName,
-      caption: p.caption,
-    })
-    .select('id')
-    .single();
+export async function uploadPhoto(userId: string, p: NewPhoto, key?: PublishKey): Promise<string> {
+  const k = key ?? newPublishKey(userId, p.mimeType);
+  if (!k.uploaded) {
+    const up = await supabase.storage.from('photos').upload(k.path, decode(p.base64), { contentType: p.mimeType, upsert: false });
+    // «уже есть» — прошлая попытка файл загрузила, ответ просто не дошёл
+    const exists = up.error && (/exist|duplicate/i.test(up.error.message) || String((up.error as any).statusCode) === '409');
+    if (up.error && !exists) throw up.error;
+    k.uploaded = true;
+  }
+  const { error } = await supabase.from('photos').insert({
+    id: k.id,
+    user_id: userId,
+    storage_path: k.path,
+    width: p.width,
+    height: p.height,
+    taken_at: p.takenAt.toISOString(),
+    lat: p.lat,
+    lng: p.lng,
+    location_source: p.locationSource,
+    place_name: p.placeName,
+    caption: p.caption,
+  });
   if (error) {
-    await supabase.storage.from('photos').remove([path]);
+    if (error.code === '23505') return k.id; // момент уже записан прошлой попыткой
+    // сервер отказал — файл больше не нужен; обрыв связи — оставляем: запись могла пройти
+    if (!netError(error)) {
+      await supabase.storage.from('photos').remove([k.path]);
+      k.uploaded = false;
+    }
     throw error;
   }
-  return data.id as string;
+  return k.id;
 }
 
 export async function deletePhoto(p: Photo) {

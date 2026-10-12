@@ -14,7 +14,7 @@ import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING } from '@/lib/design';
 import { clearSavedDraft, getDraft, saveDraft, setDraft, takeDraftExtras, type Draft } from '@/lib/draft';
 import { requestMapFocus } from '@/lib/focus';
-import { boundsAround, fetchPhotosV2, uploadPhoto } from '@/lib/photos';
+import { boundsAround, fetchPhotosV2, newPublishKey, uploadPhoto, type PublishKey } from '@/lib/photos';
 import { reverseAddress } from '@/lib/places';
 import type { Photo } from '@/lib/types';
 import { SheetGrab } from '@/components/ui/SheetGrab';
@@ -53,6 +53,7 @@ export default function PublishScreen() {
   const [address, setAddress] = useState<string | null>(saved?.address ?? null); // адрес с номером дома — в C3, как на карте C4
   const [caption, setCaption] = useState(saved?.caption ?? '');
   const [pubError, setPubError] = useState<PubError | null>(null);
+  const pubKey = useRef<PublishKey | null>(null); // один момент на все «Повторить»
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState<{ at: Date; lat: number; lng: number; people: Photo[] } | null>(null);
   // Нет места → сразу C4, нет времени → C5 (заметка C3)
@@ -88,6 +89,7 @@ export default function PublishScreen() {
     if (!draft.takenAt) return setView('time');
     setUploading(true);
     try {
+      pubKey.current ??= newPublishKey(session.user.id, draft.mimeType);
       await uploadPhoto(session.user.id, {
         base64: draft.base64,
         mimeType: draft.mimeType,
@@ -99,12 +101,13 @@ export default function PublishScreen() {
         locationSource: draft.locationSource,
         placeName: place,
         caption: caption.trim() || null,
-      });
+      }, pubKey.current);
       // C6: сразу считаем, кто ещё снимал здесь ±15 минут
       const t = draft.takenAt.getTime();
       const near = await fetchPhotosV2(boundsAround(draft.lat, draft.lng, 100), new Date(t - 15 * 60000), new Date(t + 15 * 60000), 300).catch(() => []);
       const people = Array.from(new Map(near.filter((p) => p.user_id !== session.user.id).map((p) => [p.user_id, p])).values());
       clearSavedDraft(); // опубликовано — черновик больше не нужен
+      pubKey.current = null;
       setPubError(null);
       setDone({ at: draft.takenAt, lat: draft.lat, lng: draft.lng, people });
       setView('done');
