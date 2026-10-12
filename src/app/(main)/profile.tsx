@@ -77,6 +77,10 @@ export default function ProfileScreen() {
             <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
               {name}
             </Text>
+            {/* 12.10: как у всех — ник · город, ниже «В DreamApp с …» */}
+            <Text style={styles.nick} numberOfLines={1}>
+              {[profile?.username ? `@${profile.username}` : '', profile?.city ?? ''].filter(Boolean).join(' · ').toUpperCase() || ' '}
+            </Text>
             <Text style={styles.since}>{since ? `В DREAMAPP С ${monthYearUpper(since)}` : ' '}</Text>
           </View>
         </Pressable>
@@ -201,7 +205,8 @@ const styles = StyleSheet.create({
   avatarEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: D.sun },
   avatarLetter: { fontFamily: F.serif, fontSize: 36, color: D.white },
   name: { fontFamily: F.serif, fontSize: 32, color: D.ink },
-  since: { marginTop: 2, marginLeft: 2, fontFamily: F.monoRegular, fontSize: 11, letterSpacing: 0.66, color: D.ink60 },
+  nick: { marginTop: 2, marginLeft: 2, fontFamily: F.mono, fontSize: 11, letterSpacing: 0.66, color: D.ink60 },
+  since: { marginTop: 4, marginLeft: 2, fontFamily: F.monoRegular, fontSize: 11, letterSpacing: 0.66, color: D.ink60 },
   stats: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginTop: 20 },
   stat: { flex: 1, backgroundColor: D.white, borderRadius: 18, paddingTop: 12, paddingBottom: 14, paddingHorizontal: 16 },
   statN: { fontFamily: F.serif, fontSize: 30, color: D.ink },

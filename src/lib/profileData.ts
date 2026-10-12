@@ -60,7 +60,7 @@ export async function dismissMatch(uid: string, m: Match) {
 }
 
 export async function fetchProfile(id: string): Promise<Profile | null> {
-  const { data } = await supabase.from('profiles').select('id,username,display_name,avatar_url,bio,city').eq('id', id).maybeSingle();
+  const { data } = await supabase.from('profiles').select('id,username,display_name,avatar_url,bio,city,created_at').eq('id', id).maybeSingle();
   return (data as Profile) ?? null;
 }
 

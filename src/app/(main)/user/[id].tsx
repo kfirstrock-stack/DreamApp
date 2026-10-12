@@ -12,7 +12,7 @@ import { Stagger } from '@/components/ui/Stagger';
 import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING } from '@/lib/design';
 import { hideAuthor, photoSource } from '@/lib/photos';
-import { compact, dayLower, fetchAuthorPhotos, fetchMatches, fetchProfile, fetchStats, plural, type Match, type Stats } from '@/lib/profileData';
+import { compact, dayLower, fetchAuthorPhotos, fetchMatches, fetchProfile, fetchStats, monthYearUpper, plural, type Match, type Stats } from '@/lib/profileData';
 import type { Photo, Profile } from '@/lib/types';
 
 export default function UserScreen() {
@@ -72,6 +72,7 @@ export default function UserScreen() {
             <Text style={styles.nick} numberOfLines={1}>
               {[p?.username ? `@${p.username}` : '', p?.city ?? ''].filter(Boolean).join(' · ').toUpperCase() || ' '}
             </Text>
+            <Text style={styles.since}>{p?.created_at ? `В DREAMAPP С ${monthYearUpper(new Date(p.created_at))}` : ' '}</Text>
           </View>
         </View>
 
@@ -156,6 +157,7 @@ const styles = StyleSheet.create({
   avatarLetter: { fontFamily: F.serif, fontSize: 36, color: D.white },
   name: { fontFamily: F.serif, fontSize: 30, color: D.ink },
   nick: { marginTop: 4, marginLeft: 2, fontFamily: F.mono, fontSize: 11, letterSpacing: 0.66, color: D.ink60 },
+  since: { marginTop: 4, marginLeft: 2, fontFamily: F.monoRegular, fontSize: 11, letterSpacing: 0.66, color: D.ink60 },
   stats: { flexDirection: 'row', gap: 10, paddingHorizontal: 24, marginTop: 22 },
   stat: { flex: 1, backgroundColor: D.white, borderRadius: 18, paddingTop: 12, paddingBottom: 14, paddingHorizontal: 16 },
   statN: { fontFamily: F.serif, fontSize: 28, color: D.ink },
