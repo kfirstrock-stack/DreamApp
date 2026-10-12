@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -634,6 +634,7 @@ export default function MapScreen() {
         showsPointsOfInterests={false}
       />
 
+      {__DEV__ && <NavDebug top={insets.top + 120} />}
       {/* E1: без сети сохранённые снимки приглушены */}
       {size.w > 0 && (
         <View style={[StyleSheet.absoluteFill, offline && { opacity: 0.55 }]} pointerEvents="box-none">
@@ -1009,3 +1010,14 @@ const styles = StyleSheet.create({
   ellipsis: { flexDirection: 'row', gap: 2.6, marginRight: 3, marginBottom: 6 },
   ellDot: { width: 2.6, height: 2.6, borderRadius: 1.3, backgroundColor: D.ink60, opacity: 0.8 },
 });
+
+// ВРЕМЕННО (12.10): показать стек экранов — ищем, почему карта открывается «листом»
+function NavDebug({ top }: { top: number }) {
+  const st = useRootNavigationState() as any;
+  const fmt = (s: any): string => (s?.routes ?? []).map((r: any) => r.name + (r.state ? `[${fmt(r.state)}]` : '')).join(' > ');
+  return (
+    <Text pointerEvents="none" style={{ position: 'absolute', top, left: 12, right: 12, zIndex: 9999, fontSize: 11, backgroundColor: '#fff', color: '#000' }}>
+      {`NAV ${st?.index}: ${fmt(st)}`}
+    </Text>
+  );
+}
