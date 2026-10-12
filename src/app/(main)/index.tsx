@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { router, useFocusEffect } from 'expo-router';
@@ -66,8 +67,11 @@ const NIGHT_STYLE = [
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#151a22' }] },
 ];
 
-// Старт — Исаакиевская площадь (там демо-снимки)
+// Запасной старт — Исаакиевская площадь (там демо-снимки): если нет ни геопозиции, ни прошлого места
 const START: MapRegion = { latitude: 59.9341, longitude: 30.3061, latitudeDelta: 0.009, longitudeDelta: 0.009 };
+const LAST_REGION_KEY = 'dreamapp.lastMapRegion';
+// Название места в поиске — только при близком масштабе (примерно район); дальше — «Найти место»
+const PLACE_NAME_MAX_DELTA = 0.03;
 
 // Тёплая приглушённая карта для Android (на iPhone — mutedStandard)
 const WARM_STYLE = [
@@ -298,21 +302,48 @@ export default function MapScreen() {
     });
   }, [ready, session]);
 
-  // При старте — шкала на «сейчас», карта — к последнему снимку; если сегодня пусто, и шкала к нему
+  // При старте (12.10): карта — где вы сейчас (если геопозиция уже разрешена; сами не спрашиваем),
+  // иначе — где вы были на карте в прошлый раз, иначе — к последнему снимку у Исаакиевского.
+  // Шкала — на «сейчас»; если сегодня в этом месте пусто — к времени последнего снимка рядом.
   const started = useRef(false);
   useEffect(() => {
     if (started.current || !size.w || !sheet.y) return;
     started.current = true;
-    fetchLatestIn(regionBounds(START, 3))
-      .then((p) => {
-        if (!p) return;
-        flyTo(p.lat, p.lng);
-        // утверждено 12.10: первым экраном — «сейчас»; к последнему снимку по времени — только если сегодня здесь пусто
-        const today = rangeStart('15m', new Date());
-        if (new Date(p.taken_at) < today) goTo(new Date(p.taken_at));
-      })
-      .catch(() => setOffline(true));
-  }, [size.w, sheet.y, flyTo, goTo]);
+    const today = rangeStart('15m', new Date());
+    const toLatestTime = (p: Photo | null) => {
+      if (p && new Date(p.taken_at) < today) goTo(new Date(p.taken_at));
+    };
+    (async () => {
+      let here: { lat: number; lng: number } | null = null;
+      try {
+        const perm = await Location.getForegroundPermissionsAsync();
+        if (perm.granted) {
+          const pos =
+            (await Location.getLastKnownPositionAsync({ maxAge: 10 * 60 * 1000 })) ??
+            (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
+          here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        }
+      } catch {}
+      if (here) {
+        flyTo(here.lat, here.lng);
+        return toLatestTime(await fetchLatestIn(regionBounds(focusRegion(here.lat, here.lng), 3)).catch(() => null));
+      }
+      const saved = await AsyncStorage.getItem(LAST_REGION_KEY).then((s) => (s ? (JSON.parse(s) as MapRegion) : null)).catch(() => null);
+      if (saved && Number.isFinite(saved.latitude) && Number.isFinite(saved.longitudeDelta)) {
+        mapRef.current?.animateToRegion(saved, 1);
+        regionSV.value = saved;
+        setRegion(saved);
+        return toLatestTime(await fetchLatestIn(regionBounds(saved, 3)).catch(() => null));
+      }
+      const p = await fetchLatestIn(regionBounds(START, 3)).catch(() => {
+        setOffline(true);
+        return null;
+      });
+      if (!p) return;
+      flyTo(p.lat, p.lng);
+      toLatestTime(p);
+    })();
+  }, [size.w, sheet.y, flyTo, goTo, focusRegion, regionSV]);
 
   // Возврат на карту: обновить лайки и выполнить «перелёт», если его попросили
   useFocusEffect(
@@ -557,6 +588,7 @@ export default function MapScreen() {
   const windowAuthors = useMemo(() => Array.from(new Map(windowPhotos.map((p) => [p.user_id, p])).values()), [windowPhotos]);
   // B1: в поиске — название места в центре карты (по ближайшему снимку)
   const placeName = useMemo(() => {
+    if (region.longitudeDelta > PLACE_NAME_MAX_DELTA) return null;
     let best: string | null = null, bd = Infinity;
     for (const p of knownPlaces.values()) {
       const dd = (p.lat - region.latitude) ** 2 + (p.lng - region.longitude) ** 2;
@@ -583,6 +615,7 @@ export default function MapScreen() {
         }}
         onRegionChangeComplete={(r) => {
           if (flyTimer.current) clearTimeout(flyTimer.current);
+          AsyncStorage.setItem(LAST_REGION_KEY, JSON.stringify(r)).catch(() => {}); // прошлое место — для следующего запуска
           regionSV.value = r;
           setRegion(r);
         }}
