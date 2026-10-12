@@ -31,6 +31,9 @@ type Props = {
   footer?: ReactNode;
   ticks?: { i: number; label: string }[]; // подписи под шкалой
   compact?: boolean; // S2: тонкие столбики 24 пт без подписей
+  // Бесконечная шкала (утверждено 12.10): потянули за край — соседние сутки/месяц/год.
+  onEdge?: (dir: -1 | 1) => void;
+  canNext?: boolean; // вперёд — не дальше «сейчас»
 };
 
 const Bar = memo(function Bar({ i, h, w, x }: { i: number; h: number; w: number; x: SharedValue<number> }) {
@@ -48,7 +51,7 @@ const Bar = memo(function Bar({ i, h, w, x }: { i: number; h: number; w: number;
 // Шкала-гистограмма суток: едет за пальцем, после броска докатывается по инерции,
 // тап по гистограмме — переход к моменту, щелчок вибрацией на каждом шаге.
 export const TimeScrubber = memo(function TimeScrubber({
-  counts, initialIndex, now, index, onIndexChange, jumpTo, sidePadding = 12, header, footer, ticks, compact = false,
+  counts, initialIndex, now, index, onIndexChange, jumpTo, sidePadding = 12, header, footer, ticks, compact = false, onEdge, canNext = false,
 }: Props) {
   const maxH = compact ? 20 : MAX_H;
   const barW = compact ? 4 : BAR_W;
@@ -125,6 +128,20 @@ export const TimeScrubber = memo(function TimeScrubber({
       })
       .onEnd((e) => {
         const v = -e.velocityX;
+        // за левый край (раньше 00:00) — предыдущий диапазон, шкала продолжает с его конца
+        if (onEdge && (x.value < -ITEM * 0.8 || (x.value <= 0 && v < -900))) {
+          x.value = maxX + ITEM + Math.min(0, x.value);
+          scheduleOnRN(onEdge, -1);
+          settle();
+          return;
+        }
+        // за правый край — следующий диапазон (если он не в будущем)
+        if (onEdge && canNext && (x.value > maxX + ITEM * 0.8 || (x.value >= maxX && v > 900))) {
+          x.value = Math.max(0, x.value - maxX) - ITEM;
+          scheduleOnRN(onEdge, 1);
+          settle();
+          return;
+        }
         if (Math.abs(v) < 60 || x.value < 0 || x.value > maxX) {
           settle();
           return;
@@ -150,7 +167,7 @@ export const TimeScrubber = memo(function TimeScrubber({
       });
     return Gesture.Exclusive(pan, tap);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maxX, center]);
+  }, [maxX, center, onEdge, canNext]);
 
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: center - ITEM / 2 - x.value }] }));
 

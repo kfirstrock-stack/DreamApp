@@ -201,6 +201,21 @@ export default function MapScreen() {
     now.value = withTiming(i * STEP_MIN + STEP_MIN / 2, { duration: 260 });
     Haptics.selectionAsync().catch(() => {});
   };
+  // Бесконечная шкала: шкала уже доехала до края соседнего диапазона — переключаем день/месяц/год
+  // (стабильная функция: шкала пересобирает жест только при смене дня/шага, а не на каждом щелчке)
+  const edgeShift = useCallback(
+    (dir: -1 | 1) => {
+      setJump(null);
+      const st = shiftRange(step, start, dir);
+      if (dir > 0 && st > new Date()) return;
+      const i = dir < 0 ? bucketCount(step, st) - 1 : 0;
+      setStart(st);
+      setIndex(i);
+      indexSV.value = i;
+      now.value = i * STEP_MIN + STEP_MIN / 2;
+    },
+    [step, start, indexSV, now],
+  );
   const miniGesture = Gesture.Race(
     // горизонталь: срабатывает рано и прощает «дугу» большого пальца (диагональ до ~45°)
     Gesture.Pan()
@@ -594,6 +609,8 @@ export default function MapScreen() {
               index={indexSV}
               onIndexChange={setIndex}
               jumpTo={jump}
+              onEdge={edgeShift}
+              canNext={!isToday}
               footer={
                 mode === 'full' ? (
             inWindow > 0 ? (
