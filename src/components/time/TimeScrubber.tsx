@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { memo, useEffect, useMemo, type ReactNode } from 'react';
+import { memo, useEffect, useMemo, type ReactNode, useRef } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -70,6 +70,11 @@ export const TimeScrubber = memo(function TimeScrubber({
   const heights = useMemo(() => counts.map((c) => (c === 0 ? (compact ? 2 : 3) : (compact ? 5 : 8) + (c / max) * (maxH - (compact ? 5 : 8)))), [counts, max, maxH, compact]);
 
   const auto = useSharedValue(false); // шкала едет сама (по команде) — без вибрации
+  // край шкалы: зовём родителя с JS-потока (через ref — всегда свежий обработчик)
+  const edgeRef = useRef(onEdge);
+  edgeRef.current = onEdge;
+  const hasEdge = !!onEdge;
+  const edge = (dir: -1 | 1) => edgeRef.current?.(dir);
   const tick = (i: number, quiet: boolean) => {
     if (!quiet) Haptics.selectionAsync().catch(() => {});
     onIndexChange(i);
@@ -129,16 +134,16 @@ export const TimeScrubber = memo(function TimeScrubber({
       .onEnd((e) => {
         const v = -e.velocityX;
         // за левый край (раньше 00:00) — предыдущий диапазон, шкала продолжает с его конца
-        if (onEdge && (x.value < -ITEM * 0.8 || (x.value <= 0 && v < -900))) {
+        if (hasEdge && (x.value < -ITEM * 0.8 || (x.value <= 0 && v < -900))) {
           x.value = maxX + ITEM + Math.min(0, x.value);
-          scheduleOnRN(onEdge, -1);
+          scheduleOnRN(edge, -1);
           settle();
           return;
         }
         // за правый край — следующий диапазон (если он не в будущем)
-        if (onEdge && canNext && (x.value > maxX + ITEM * 0.8 || (x.value >= maxX && v > 900))) {
+        if (hasEdge && canNext && (x.value > maxX + ITEM * 0.8 || (x.value >= maxX && v > 900))) {
           x.value = Math.max(0, x.value - maxX) - ITEM;
-          scheduleOnRN(onEdge, 1);
+          scheduleOnRN(edge, 1);
           settle();
           return;
         }
@@ -167,7 +172,7 @@ export const TimeScrubber = memo(function TimeScrubber({
       });
     return Gesture.Exclusive(pan, tap);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maxX, center, onEdge, canNext]);
+  }, [maxX, center, hasEdge, canNext]);
 
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: center - ITEM / 2 - x.value }] }));
 
