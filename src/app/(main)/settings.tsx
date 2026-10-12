@@ -1,8 +1,8 @@
-// D5 · Настройки и D6 · Удаление аккаунта (диалог поверх). «Скрытые авторы» → D9, правила/конфиденциальность → D7/D8
+// D5 · Настройки (с «Разрешениями» → системные настройки) и D6 · Удаление аккаунта (диалог поверх). «Скрытые авторы» → D9, правила/конфиденциальность → D7/D8
 import Constants from 'expo-constants';
 import { router, useFocusEffect } from 'expo-router';
 import { type ReactNode, useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -86,6 +86,9 @@ export default function SettingsScreen() {
             <Row title="Участвовать в совпадениях" onPress={toggle} right={<Toggle on={matchesOn} />} role="switch" checked={matchesOn} />
             <Sep />
             <Row title="Скрытые авторы" value={hidden != null ? String(hidden) : ''} chevron onPress={() => router.push('/hidden')} />
+            <Sep />
+            {/* 12.10: разрешения меняются только в настройках iPhone — открываем страницу DreamApp там */}
+            <Row title="Разрешения" value="Камера, фото, место" chevron onPress={() => Linking.openSettings().catch(() => {})} />
           </View>
           </Stagger>
 
