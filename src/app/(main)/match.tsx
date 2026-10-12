@@ -1,4 +1,5 @@
-// D2 · Совпадение: ваше фото и чужое рядом по месту и времени. Автор → D3, «Посмотреть фото …» → фото, «Это не я — скрыть» — навсегда
+// D2 · Совпадение: ваше фото и чужое рядом по месту и времени. Автор → D3, «Посмотреть фото …» → фото,
+// «Это я» — отметка для себя (D2 · Вы в кадре, отменяется), «Это не я — скрыть» — навсегда
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -10,7 +11,7 @@ import { Stagger } from '@/components/ui/Stagger';
 import { useAuth } from '@/lib/auth';
 import { D, F } from '@/lib/design';
 import { photoSource } from '@/lib/photos';
-import { cachedMatch, dative, dayUpper, dismissMatch, fetchMatches, fetchStats, genitive, hm, matchKey, plural, type Match } from '@/lib/profileData';
+import { cachedMatch, dative, dayUpper, dismissMatch, setMatchConfirmed, fetchMatches, fetchStats, genitive, hm, matchKey, plural, type Match } from '@/lib/profileData';
 
 export default function MatchScreen() {
   const { key } = useLocalSearchParams<{ key: string }>();
@@ -44,6 +45,15 @@ export default function MatchScreen() {
       .then(() => router.back())
       .catch(() => Alert.alert('Не получилось', 'Проверьте интернет и попробуйте ещё раз.'));
   };
+  // сразу меняем вид, сохраняем следом; не вышло — возвращаем как было
+  const confirm = (on: boolean) => {
+    if (!session) return;
+    setM({ ...m, confirmed: on });
+    setMatchConfirmed(session.user.id, m, on).catch(() => {
+      setM({ ...m, confirmed: !on });
+      Alert.alert('Не получилось', 'Проверьте интернет и попробуйте ещё раз.');
+    });
+  };
   const openAuthor = () => router.push({ pathname: '/user/[id]', params: { id: m.other_user_id } });
 
   return (
@@ -54,8 +64,8 @@ export default function MatchScreen() {
         </View>
         <View style={styles.body}>
           <Stagger i={0}>
-          <Text style={styles.kicker}>СОВПАДЕНИЕ</Text>
-          <Text style={styles.title}>Вы могли попасть в кадр к {dative(who)}</Text>
+          <Text style={styles.kicker}>{m.confirmed ? 'ВЫ В КАДРЕ ✓' : 'СОВПАДЕНИЕ'}</Text>
+          <Text style={styles.title}>{m.confirmed ? `Вы в кадре у ${genitive(who)}` : `Вы могли попасть в кадр к ${dative(who)}`}</Text>
 
           </Stagger>
           {/* два снимка-полароида и расстояние между ними */}
@@ -101,10 +111,22 @@ export default function MatchScreen() {
               Посмотреть фото {genitive(who)}
             </Text>
           </Pressable>
-          {/* 32 pt от кнопки и зона нажатия 45 pt, не заходящая на кнопку */}
-          <Pressable onPress={hide} hitSlop={{ left: 16, right: 16 }} style={styles.hide}>
-            <Text style={styles.hideText}>Это не я — скрыть</Text>
-          </Pressable>
+          {/* 32 pt от кнопки, зоны нажатия 45 pt, не заходящие на кнопку */}
+          {m.confirmed ? (
+            <Pressable onPress={() => confirm(false)} hitSlop={{ left: 16, right: 16 }} style={styles.hide}>
+              <Text style={styles.hideText}>Отменить «Это я»</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.links}>
+              <Pressable onPress={() => confirm(true)} style={styles.half} accessibilityLabel="Это я — отметить, что вы в кадре">
+                <Text style={[styles.hideText, { color: D.sun }]}>Это я</Text>
+              </Pressable>
+              <View style={styles.vdiv} />
+              <Pressable onPress={hide} style={styles.half}>
+                <Text style={styles.hideText} numberOfLines={1}>Это не я — скрыть</Text>
+              </Pressable>
+            </View>
+          )}
           </Stagger>
         </View>
       </ScrollView>
@@ -202,5 +224,8 @@ const styles = StyleSheet.create({
   button: { marginTop: 14, backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, paddingHorizontal: 20, alignItems: 'center' },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
   hide: { alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13 },
+  links: { flexDirection: 'row', alignItems: 'center', marginTop: 32 - 13 },
+  half: { flex: 1, alignItems: 'center', paddingVertical: 13 },
+  vdiv: { width: 1, height: 18, backgroundColor: 'rgba(22,19,15,0.15)' },
   hideText: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink60 },
 });

@@ -30,6 +30,7 @@ export type Match = {
   place_name: string | null;
   distance_m: number;
   minutes_apart: number;
+  confirmed?: boolean; // «Это я» (12.10)
 };
 
 // Последний загруженный список — чтобы D2 открывался мгновенно из D1
@@ -48,11 +49,28 @@ export async function fetchMatches(): Promise<Match[]> {
     seen.add(k);
     return true;
   });
-  lastMatches = list;
-  return list;
+  // «Это я» — подтверждённые совпадения первыми (порядок внутри групп — как пришёл, свежие сверху)
+  const { data: conf } = await supabase.from('match_confirmations').select('my_photo_id,other_photo_id');
+  const ok = new Set((conf ?? []).map((c: any) => `${c.my_photo_id}:${c.other_photo_id}`));
+  for (const m of list) m.confirmed = ok.has(matchKey(m));
+  const sorted = [...list.filter((m) => m.confirmed), ...list.filter((m) => !m.confirmed)];
+  lastMatches = sorted;
+  return sorted;
 }
 
 /** «Это не я — скрыть»: совпадение больше не показываем никогда */
+/** «Это я» / отмена: отметка только для себя, автор её не видит */
+export async function setMatchConfirmed(uid: string, m: Match, on: boolean) {
+  const q = supabase.from('match_confirmations');
+  const { error } = on
+    ? await q.insert({ user_id: uid, my_photo_id: m.my_photo_id, other_photo_id: m.other_photo_id })
+    : await q.delete().eq('user_id', uid).eq('my_photo_id', m.my_photo_id).eq('other_photo_id', m.other_photo_id);
+  if (error && error.code !== '23505') throw error;
+  const k = matchKey(m);
+  lastMatches = lastMatches.map((x) => (matchKey(x) === k ? { ...x, confirmed: on } : x));
+  lastMatches = [...lastMatches.filter((x) => x.confirmed), ...lastMatches.filter((x) => !x.confirmed)];
+}
+
 export async function dismissMatch(uid: string, m: Match) {
   const { error } = await supabase.from('match_dismissals').insert({ user_id: uid, my_photo_id: m.my_photo_id, other_photo_id: m.other_photo_id });
   if (error && error.code !== '23505') throw error;

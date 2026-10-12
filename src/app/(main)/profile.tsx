@@ -14,7 +14,7 @@ import { D, F } from '@/lib/design';
 import { requestMapFocus } from '@/lib/focus';
 import { photoSource } from '@/lib/photos';
 import {
-  compact, dative, dayUpper, fetchAuthorPhotos, fetchMatches, fetchStats, hm, matchKey, monthYearUpper, nickLine, plural, type Match, type Stats,
+  compact, dative, dayUpper, genitive, fetchAuthorPhotos, fetchMatches, fetchStats, hm, matchKey, monthYearUpper, nickLine, plural, type Match, type Stats,
 } from '@/lib/profileData';
 import { supabase } from '@/lib/supabase';
 import type { Photo } from '@/lib/types';
@@ -188,7 +188,7 @@ function MatchCard({ m, w }: { m: Match; w: number }) {
         <Image source={photoSource(m.other_storage_path)} style={styles.miniImg} contentFit="cover" />
       </View>
       <Text style={styles.cardTitle} numberOfLines={2}>
-        Вы могли попасть в кадр к {dative(who)}
+        {m.confirmed ? `Вы в кадре у ${genitive(who)} ✓` : `Вы могли попасть в кадр к ${dative(who)}`}
       </Text>
       <Text style={styles.cardMeta} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
         {meta}
