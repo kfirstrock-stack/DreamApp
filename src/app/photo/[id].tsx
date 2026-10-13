@@ -201,6 +201,32 @@ export default function PhotoScreen() {
     return { opacity: 1 - k, transform: [{ translateY: -k * (insets.top + 80) }] };
   });
 
+  // 13.10: закрыть — свайп вправо из любого места (как «назад» в iOS) или свайп вниз на первом кадре
+  const swipeX = useSharedValue(0);
+  const goBack = useCallback(() => router.back(), []);
+  const closePan = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(!sheetOpen && !full)
+        .activeOffsetX(18)
+        .failOffsetX(-18)
+        .failOffsetY([-14, 14]) // вертикальное движение — листание кадров, не закрытие
+        .onUpdate((e) => {
+          swipeX.value = Math.max(0, e.translationX);
+        })
+        .onFinalize((e) => {
+          if (swipeX.value > 110 || (e.velocityX > 800 && swipeX.value > 30)) {
+            swipeX.value = withTiming(width, { duration: 200, easing: Easing.out(Easing.cubic) });
+            scheduleOnRN(goBack);
+          } else swipeX.value = withSpring(0, { damping: 18, stiffness: 220 });
+        }),
+    [sheetOpen, full, width, goBack], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const swipeStyle = useAnimatedStyle(() => {
+    const k = Math.min(1, swipeX.value / width);
+    return { opacity: 1 - k * 0.6, transform: [{ translateX: swipeX.value }, { scale: 1 - k * 0.08 }] };
+  });
+
   const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const v = viewableItems.find((x) => x.isViewable);
     if (v?.index != null) setIndex(v.index);
@@ -280,6 +306,8 @@ export default function PhotoScreen() {
   return (
     <View style={styles.root}>
       <StatusBar style="light" hidden={full || uiHidden} animated />
+      <GestureDetector gesture={closePan}>
+      <Animated.View style={[StyleSheet.absoluteFill, swipeStyle]}>
       <FlatList
         key={`${listKey}-${landscape ? 'l' : 'p'}`}
         data={list}
@@ -293,6 +321,10 @@ export default function PhotoScreen() {
         maxToRenderPerBatch={2}
         scrollEnabled={!sheetOpen && !full}
         onViewableItemsChanged={onViewable}
+        onScrollEndDrag={(e) => {
+          // на первом кадре потянули вниз — закрыть (iOS даёт оттянуть за край)
+          if (index === 0 && e.nativeEvent.contentOffset.y < -70) router.back();
+        }}
         viewabilityConfig={VIEWABILITY}
         renderItem={({ item, index: i }) => (
           <Page
@@ -352,6 +384,9 @@ export default function PhotoScreen() {
           onWhoElse={openWhoElse}
         />
       )}
+
+      </Animated.View>
+      </GestureDetector>
 
       {full && <FullView photo={cur} width={width} height={height} fullP={fullP} onClose={() => setFullMode(false)} />}
 
@@ -564,8 +599,11 @@ type SheetProps = {
 
 function DetailsSheet(props: SheetProps) {
   const { photo, near, people, peekH, bottomInset, hideP, fullP, hidden, control } = props;
+  // 13.10 (№ «слои накладываются»): открытость шторки храним сама по себе — 0 свёрнута, 1 открыта.
+  // Раньше её вычисляли из высоты, и при смене кадра она «застревала» посередине: дата и автор просвечивали
   const sheetH = useSharedValue(0);
-  const off = useSharedValue(2000); // насколько шторка опущена (0 — открыта целиком)
+  const prog = useSharedValue(0);
+  const enter = useSharedValue(1); // появление полоски снизу при открытии экрана
   const start = useSharedValue(0);
   const dragging = useSharedValue(0);
   const openSV = useSharedValue(0);
@@ -583,10 +621,10 @@ function DetailsSheet(props: SheetProps) {
     (o: boolean) => {
       if ((openSV.value === 1) === o) return;
       openSV.value = o ? 1 : 0;
-      off.value = withSpring(o ? 0 : Math.max(0, sheetH.value - peekH), SHEET_SPRING);
+      prog.value = withSpring(o ? 1 : 0, SHEET_SPRING);
       report(o);
     },
-    [openSV, off, sheetH, peekH, report],
+    [openSV, prog, report],
   );
   useEffect(() => {
     control.current = { open: setOpen };
@@ -598,25 +636,25 @@ function DetailsSheet(props: SheetProps) {
         .activeOffsetY([-8, 8])
         .failOffsetX([-20, 20])
         .onStart(() => {
-          start.value = off.value;
+          start.value = prog.value;
           dragging.value = 1;
         })
         .onUpdate((e) => {
-          const m = Math.max(0, sheetH.value - peekH);
-          let v = start.value + e.translationY;
-          if (v < 0) v *= 0.25; // резинка за краями
-          if (v > m) v = m + (v - m) * 0.25;
-          off.value = v;
+          const m = Math.max(1, sheetH.value - peekH);
+          let v = start.value - e.translationY / m;
+          if (v > 1) v = 1 + (v - 1) * 0.25; // резинка за краями
+          if (v < 0) v *= 0.25;
+          prog.value = v;
         })
         // onFinalize, а не onEnd: срабатывает и когда жест прерван (иначе шторка застревала на полпути)
         .onFinalize((e) => {
           if (!dragging.value) return;
           dragging.value = 0;
-          const m = Math.max(0, sheetH.value - peekH);
-          const o = e.velocityY < -400 ? true : e.velocityY > 400 ? false : off.value < m / 2;
+          const m = Math.max(1, sheetH.value - peekH);
+          const o = e.velocityY < -400 ? true : e.velocityY > 400 ? false : prog.value > 0.5;
           const changed = (openSV.value === 1) !== o;
           openSV.value = o ? 1 : 0;
-          off.value = withSpring(o ? 0 : m, { ...SHEET_SPRING, velocity: e.velocityY });
+          prog.value = withSpring(o ? 1 : 0, { ...SHEET_SPRING, velocity: -e.velocityY / m });
           if (changed) scheduleOnRN(report, o);
         }),
     [peekH], // eslint-disable-line react-hooks/exhaustive-deps
@@ -624,15 +662,19 @@ function DetailsSheet(props: SheetProps) {
 
   const openness = () => {
     'worklet';
-    const m = sheetH.value - peekH;
-    return m > 0 ? Math.min(1, Math.max(0, 1 - off.value / m)) : 0;
+    return Math.min(1, Math.max(0, prog.value));
   };
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: off.value + Math.max(hideP.value, fullP.value) * (peekH + 20) }],
-  }));
+  const sheetStyle = useAnimatedStyle(() => {
+    const m = Math.max(0, sheetH.value - peekH);
+    const away = Math.max(hideP.value, fullP.value, enter.value);
+    return {
+      opacity: sheetH.value > 0 ? 1 : 0, // пока не знаем высоту — не показываем
+      transform: [{ translateY: (1 - prog.value) * m + away * (peekH + 20) }],
+    };
+  });
   const peekStyle = useAnimatedStyle(() => ({ opacity: 1 - Math.min(1, openness() * 2.5) }));
   const bodyStyle = useAnimatedStyle(() => ({ opacity: Math.pow(openness(), 2) }));
-  const stampStyle = useAnimatedStyle(() => ({ opacity: openness() }));
+  const stampStyle = useAnimatedStyle(() => ({ opacity: Math.max(0, openness() * 2 - 1) }));
 
   const taken = new Date(photo.taken_at);
   const n = people?.length ?? 0;
@@ -651,12 +693,9 @@ function DetailsSheet(props: SheetProps) {
           <View
             style={[styles.sheet, { paddingBottom: bottomInset + 12 }]}
             onLayout={(e) => {
-              const h = e.nativeEvent.layout.height;
               const first = sheetH.value === 0;
-              sheetH.value = h;
-              if (dragging.value) return; // пока шторку держат пальцем — не трогаем
-              const closed = Math.max(0, h - peekH);
-              if (openSV.value === 0) off.value = first ? withSpring(closed, SHEET_SPRING) : withTiming(closed);
+              sheetH.value = e.nativeEvent.layout.height;
+              if (first) enter.value = withSpring(0, SHEET_SPRING);
             }}
           >
             <View style={styles.grip}>
