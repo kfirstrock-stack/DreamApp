@@ -140,19 +140,30 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter, returning, onO
   const titleH = useSharedValue(0);
   const bodyH = useSharedValue(0);
   const lowerH = useRef(0);
+  const kbH = useRef(0);
+  // что из текста помещается над полем при открытой клавиатуре (заголовок важнее подписи)
+  const fitText = (duration = 250) => {
+    const t = { duration, easing: Easing.out(Easing.cubic) };
+    // место над полем: от статус-бара до верха поля (поле, кнопка и ссылка стоят на клавиатуре)
+    const avail = height - kbH.current - lowerH.current - insets.top - 16 - 32; // 32 — «DreamApp»
+    const tH = titleH.value;
+    const bH = bodyH.value;
+    const title = tH + bH <= avail || tH <= avail;
+    const body = tH + bH <= avail || (!title && bH <= avail);
+    keepTitle.value = withTiming(title ? 1 : 0, t);
+    keepBody.value = withTiming(body ? 1 : 0, t);
+  };
+  // 12.10 (№7): текст сменился при открытой клавиатуре — пересчитать, иначе он обрезался по старым размерам
+  const measured = (which: 'title' | 'body', h: number) => {
+    (which === 'title' ? titleH : bodyH).value = h;
+    if (kbOpen.current) fitText(150);
+  };
   useEffect(() => {
     const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', (e) => {
       kbOpen.current = true;
-      const t = { duration: e.duration || 250, easing: Easing.out(Easing.cubic) };
-      // место над полем: от статус-бара до верха поля (поле, кнопка и ссылка стоят на клавиатуре)
-      const avail = height - e.endCoordinates.height - lowerH.current - insets.top - 16 - 32; // 32 — «DreamApp»
-      const tH = titleH.value;
-      const bH = bodyH.value;
-      const title = tH + bH <= avail || tH <= avail; // заголовок важнее подписи
-      const body = tH + bH <= avail || (!title && bH <= avail);
-      keepTitle.value = withTiming(title ? 1 : 0, t);
-      keepBody.value = withTiming(body ? 1 : 0, t);
-      kb.value = withTiming(1, t);
+      kbH.current = e.endCoordinates.height;
+      fitText(e.duration || 250);
+      kb.value = withTiming(1, { duration: e.duration || 250, easing: Easing.out(Easing.cubic) });
     });
     const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', (e) => {
       kbOpen.current = false;
@@ -189,6 +200,8 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter, returning, onO
   return (
     <View style={styles.dark}>
       <StatusBar style="light" />
+      {/* №8 (12.10): тап по пустому месту — убрать клавиатуру */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={Keyboard.dismiss} accessible={false} />
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, artKb]}>
       <Animated.View style={[at(-1.68, 41.65, 276.33, 322.67), eLeft]}>
         <Image source={ART.left} style={StyleSheet.absoluteFill} contentFit="contain" />
@@ -210,12 +223,12 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter, returning, onO
         <View onLayout={(e) => !kbOpen.current && setTextTop(height - e.nativeEvent.layout.height)} style={{ paddingHorizontal: 32, paddingBottom: Math.max(insets.bottom - 3 - 13, 0) }}>
           <Animated.Text style={[styles.brand, t1]}>DreamApp</Animated.Text>
           <Animated.View style={[{ overflow: 'hidden' }, titleKb]}>
-            <View onLayout={(e) => (titleH.value = e.nativeEvent.layout.height)}>
+            <View style={{ width: width - 64 }} onLayout={(e) => measured('title', e.nativeEvent.layout.height)}>
               <Animated.Text style={[styles.a4Title, t2]}>{returning ? `С возвращением, ${returning.name}` : 'Каждое место помнит всех, кто там был'}</Animated.Text>
             </View>
           </Animated.View>
           <Animated.View style={[{ overflow: 'hidden' }, bodyKb]}>
-            <View onLayout={(e) => (bodyH.value = e.nativeEvent.layout.height)}>
+            <View style={{ width: width - 64 }} onLayout={(e) => measured('body', e.nativeEvent.layout.height)}>
               <Animated.Text style={[styles.a4Body, t3]}>
                 {returning
                   ? Platform.OS === 'ios'
