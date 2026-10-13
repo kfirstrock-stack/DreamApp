@@ -341,7 +341,8 @@ function PlacePicker({ draft, noGeo, onCancel, onPick }: { draft: Draft; noGeo: 
           <Pressable onPress={() => onPick(at.lat, at.lng, fresh ? addr : { address: null, place: null })} style={({ pressed }) => [styles.button, { marginTop: 24 }, pressed && { opacity: 0.88 }]}>
             <Text style={styles.buttonText}>Снимок сделан здесь</Text>
           </Pressable>
-          <Pressable onPress={onCancel} hitSlop={10} style={{ alignSelf: 'center', marginTop: 18 }}>
+          {/* 13.10: 32 pt от кнопки до «Отмены» и зона нажатия 46 pt, не заходящая на кнопку (как на A4) */}
+          <Pressable onPress={onCancel} hitSlop={{ left: 16, right: 16 }} style={{ alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13 }} accessibilityRole="button">
             <Text style={styles.cancel}>Отмена</Text>
           </Pressable>
         </View>
@@ -638,7 +639,7 @@ const styles = StyleSheet.create({
     backgroundColor: D.white,
     borderRadius: 28,
     padding: 20,
-    paddingBottom: 21,
+    paddingBottom: 21 - 13, // 13 — нижняя часть зоны нажатия «Отмены»
     shadowColor: '#17120D',
     shadowOpacity: 0.16,
     shadowRadius: 18,
