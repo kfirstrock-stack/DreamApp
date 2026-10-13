@@ -193,6 +193,12 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter, returning, onO
   const s = Math.min(width / 393, height / 852, fit);
   const dx = (width - 393 * s) / 2;
   const at = (x: number, y: number, w: number, h: number) => ({ position: 'absolute' as const, left: dx + x * s, top: insets.top + (y - 47) * s, width: w * s, height: h * s });
+  const titleText = returning ? `С возвращением, ${returning.name}` : 'Каждое место помнит всех, кто там был';
+  const bodyText = returning
+    ? Platform.OS === 'ios'
+      ? 'Пришлём код на почту — iOS подставит его из письма сама.'
+      : 'Пришлём код на почту — останется только ввести его.'
+    : 'Выкладывайте снимки с местом и временем — и находите себя на чужих фото.';
   const guest = async () => {
     await markOnboarded();
     leaveAuth();
@@ -219,24 +225,20 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter, returning, onO
         </View>
       </Animated.View>
       </Animated.View>
+      <View pointerEvents="none" style={{ position: 'absolute', left: 32, top: 0, width: width - 64, opacity: 0 }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+        <Text key={titleText} style={styles.a4Title} onLayout={(e) => measured('title', e.nativeEvent.layout.height + 3)}>{titleText}</Text>
+        <Text key={bodyText} style={styles.a4Body} onLayout={(e) => measured('body', e.nativeEvent.layout.height + 12)}>{bodyText}</Text>
+      </View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.bottom} keyboardVerticalOffset={-insets.bottom + 16}>
         <View onLayout={(e) => !kbOpen.current && setTextTop(height - e.nativeEvent.layout.height)} style={{ paddingHorizontal: 32, paddingBottom: Math.max(insets.bottom - 3 - 13, 0) }}>
           <Animated.Text style={[styles.brand, t1]}>DreamApp</Animated.Text>
+          {/* №7: видимый текст пересоздаётся при смене (key), а высоты меряют невидимые копии вне обрезки —
+              иначе iOS оставлял старую раскладку и строки резались и справа, и снизу */}
           <Animated.View style={[{ overflow: 'hidden' }, titleKb]}>
-            <View style={{ width: width - 64 }} onLayout={(e) => measured('title', e.nativeEvent.layout.height)}>
-              <Animated.Text style={[styles.a4Title, t2]}>{returning ? `С возвращением, ${returning.name}` : 'Каждое место помнит всех, кто там был'}</Animated.Text>
-            </View>
+            <Animated.Text key={titleText} style={[styles.a4Title, t2]}>{titleText}</Animated.Text>
           </Animated.View>
           <Animated.View style={[{ overflow: 'hidden' }, bodyKb]}>
-            <View style={{ width: width - 64 }} onLayout={(e) => measured('body', e.nativeEvent.layout.height)}>
-              <Animated.Text style={[styles.a4Body, t3]}>
-                {returning
-                  ? Platform.OS === 'ios'
-                    ? 'Пришлём код на почту — iOS подставит его из письма сама.'
-                    : 'Пришлём код на почту — останется только ввести его.'
-                  : 'Выкладывайте снимки с местом и временем — и находите себя на чужих фото.'}
-              </Animated.Text>
-            </View>
+            <Animated.Text key={bodyText} style={[styles.a4Body, t3]}>{bodyText}</Animated.Text>
           </Animated.View>
           <View onLayout={(e) => (lowerH.current = e.nativeEvent.layout.height)}>
           <Animated.View style={t4}>
