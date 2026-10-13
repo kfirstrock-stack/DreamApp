@@ -8,7 +8,8 @@ import Animated, { Easing, Extrapolation, interpolate, type SharedValue, useAnim
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { D, F } from '@/lib/design';
-import { forgetLastUser, loadLastUser, type LastUser } from '@/lib/lastUser';
+import { forgetLastUser, loadLastUser, type LastShot, type LastUser } from '@/lib/lastUser';
+import { photoSource } from '@/lib/photos';
 import { leaveAuth, markOnboarded } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
 
@@ -98,6 +99,46 @@ export default function SignIn() {
       returning={returning}
       onOtherEmail={otherEmail}
     />
+  );
+}
+
+// A4 «С возвращением» · свои снимки (утверждено 13.10): полароид как в макете — рамка 8, подпись «11 ОКТ 2026 · 00:13».
+// Центр, наклон и размеры — из макета (115:12/15/18); box — рамка картинки из макета, внутри которой он стоит.
+const MON_CAP = ['ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЙ', 'ИЮН', 'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК'];
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const shotCaption = (iso: string) => {
+  const d = new Date(iso);
+  return `${pad2(d.getDate())} ${MON_CAP[d.getMonth()]} ${d.getFullYear()} · ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+};
+type Slot = { box: [number, number]; c: [number, number]; w: number; h: number; rot: number };
+const SLOTS: Record<'center' | 'left' | 'right', Slot> = {
+  center: { box: [65.1, 56.2], c: [202.44, 204.5], w: 206, h: 258, rot: 2 },
+  left: { box: [-1.68, 41.65], c: [136.47, 188.99], w: 186, h: 238, rot: -9 },
+  right: { box: [178.9, 100.7], c: [291.7, 229.3], w: 166, h: 208, rot: 7 },
+};
+function Polaroid({ shot, slot, s }: { shot: LastShot; slot: Slot; s: number }) {
+  return (
+    <View
+      style={[
+        styles.polaroid,
+        {
+          left: (slot.c[0] - slot.w / 2 - slot.box[0]) * s,
+          top: (slot.c[1] - slot.h / 2 - slot.box[1]) * s,
+          width: slot.w * s,
+          height: slot.h * s,
+          padding: 8 * s,
+          borderRadius: 6 * s,
+          shadowRadius: 15 * s,
+          shadowOffset: { width: 0, height: 14 * s },
+          transform: [{ rotate: `${slot.rot}deg` }],
+        },
+      ]}
+    >
+      <Image source={photoSource(shot.path)} style={{ width: '100%', height: (slot.h - 38) * s, borderRadius: 2 * s, backgroundColor: D.paper2 }} contentFit="cover" />
+      <Text style={[styles.polaroidCap, { marginTop: 8 * s, fontSize: 9 * s, letterSpacing: 0.36 * s }]} numberOfLines={1}>
+        {shotCaption(shot.taken_at)}
+      </Text>
+    </View>
   );
 }
 
@@ -193,6 +234,7 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter, returning, onO
   const s = Math.min(width / 393, height / 852, fit);
   const dx = (width - 393 * s) / 2;
   const at = (x: number, y: number, w: number, h: number) => ({ position: 'absolute' as const, left: dx + x * s, top: insets.top + (y - 47) * s, width: w * s, height: h * s });
+  const shots = returning?.shots ?? [];
   const titleText = returning ? `С возвращением, ${returning.name}` : 'Каждое место помнит всех, кто там был';
   const bodyText = returning
     ? Platform.OS === 'ios'
@@ -209,21 +251,36 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter, returning, onO
       {/* №8 (12.10): тап по пустому месту — убрать клавиатуру */}
       <Pressable style={StyleSheet.absoluteFill} onPress={Keyboard.dismiss} accessible={false} />
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, artKb]}>
+      {/* свои снимки встают по порядку: центр → слева → справа; пустые места — картинки из макета */}
       <Animated.View style={[at(-1.68, 41.65, 276.33, 322.67), eLeft]}>
-        <Image source={ART.left} style={StyleSheet.absoluteFill} contentFit="contain" />
+        {shots[1] ? <Polaroid shot={shots[1]} slot={SLOTS.left} s={s} /> : <Image source={ART.left} style={StyleSheet.absoluteFill} contentFit="contain" />}
       </Animated.View>
       <Animated.View style={[at(178.9, 100.7, 225.67, 285.33), eRight]}>
-        <Image source={ART.right} style={StyleSheet.absoluteFill} contentFit="contain" />
+        {shots[2] ? <Polaroid shot={shots[2]} slot={SLOTS.right} s={s} /> : <Image source={ART.right} style={StyleSheet.absoluteFill} contentFit="contain" />}
       </Animated.View>
       <Animated.View style={[at(65.1, 56.2, 274.67, 324.67), eCenter]}>
-        <Image source={ART.center} style={StyleSheet.absoluteFill} contentFit="contain" />
+        {shots[0] ? <Polaroid shot={shots[0]} slot={SLOTS.center} s={s} /> : <Image source={ART.center} style={StyleSheet.absoluteFill} contentFit="contain" />}
       </Animated.View>
-      <Animated.View style={[at(176, 338, 0, 0), { overflow: 'visible' }, eTag]}>
-        <View style={[styles.placeTag, { transform: [{ scale: s }] }]}>
-          <Icon name="pin" size={14} color={D.white} />
-          <Text style={styles.placeTagText}>Исаакиевская пл.</Text>
-        </View>
-      </Animated.View>
+      {shots[0] ? (
+        // ярлык — место центрального снимка, по центру под ним; нет названия места — ярлыка нет
+        shots[0].place ? (
+          <Animated.View style={[at(249 - 180, 338, 360, 27), { alignItems: 'center' }, eTag]}>
+            <View style={[styles.placeTagReal, { transform: [{ scale: s }] }]}>
+              <Icon name="pin" size={14} color={D.white} />
+              <Text style={styles.placeTagText} numberOfLines={1}>
+                {shots[0].place}
+              </Text>
+            </View>
+          </Animated.View>
+        ) : null
+      ) : (
+        <Animated.View style={[at(176, 338, 0, 0), { overflow: 'visible' }, eTag]}>
+          <View style={[styles.placeTag, { transform: [{ scale: s }] }]}>
+            <Icon name="pin" size={14} color={D.white} />
+            <Text style={styles.placeTagText}>Исаакиевская пл.</Text>
+          </View>
+        </Animated.View>
+      )}
       </Animated.View>
       <View pointerEvents="none" style={{ position: 'absolute', left: 32, top: 0, width: width - 64, opacity: 0 }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
         <Text key={titleText} style={styles.a4Title} onLayout={(e) => measured('title', e.nativeEvent.layout.height + 3)}>{titleText}</Text>
@@ -448,6 +505,26 @@ const styles = StyleSheet.create({
     backgroundColor: D.sun,
   },
   placeTagText: { fontFamily: F.sansSemi, fontSize: 12, color: D.white },
+  placeTagReal: {
+    transformOrigin: 'center top',
+    maxWidth: 300,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingLeft: 10,
+    paddingRight: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: D.sun,
+  },
+  polaroid: {
+    position: 'absolute',
+    backgroundColor: D.paper,
+    shadowColor: '#17120D',
+    shadowOpacity: 0.45,
+    elevation: 12,
+  },
+  polaroidCap: { fontFamily: F.monoRegular, color: D.ink60 },
   brand: { fontFamily: F.serifItalic, fontSize: 22, lineHeight: 29, color: D.sun },
   a4Title: { marginTop: 3, fontFamily: F.serif, fontSize: 33, lineHeight: 39, color: D.paper },
   a4Body: { marginTop: 12, maxWidth: 320, fontFamily: F.sans, fontSize: 16, lineHeight: 23, color: 'rgba(244,239,230,0.6)' },

@@ -3,7 +3,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEY = 'dreamapp.lastUser';
-export type LastUser = { email: string; name: string; avatar: string | null };
+/** Снимок для полароида «С возвращением» (13.10): последние кадры этого человека */
+export type LastShot = { path: string; taken_at: string; place: string | null };
+export type LastUser = { email: string; name: string; avatar: string | null; shots?: LastShot[] };
 
 export async function loadLastUser(): Promise<LastUser | null> {
   try {
