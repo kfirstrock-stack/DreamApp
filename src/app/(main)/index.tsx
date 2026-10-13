@@ -26,6 +26,7 @@ import { TAB_BAR_SPACE, TabBar } from '@/components/ui/TabBar';
 import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING, STEP_MIN, softShadow } from '@/lib/design';
 import { consumeMapFocus } from '@/lib/focus';
+import { openPhotoFeed } from '@/lib/feed';
 import { hideSplash, isOnboarded } from '@/lib/onboarding';
 import { project, regionBounds, regionRadiusM, type MapRegion } from '@/lib/geo';
 import { fetchLatestIn, fetchPhotosV2 } from '@/lib/photos';
@@ -70,6 +71,13 @@ const NIGHT_STYLE = [
 ];
 
 // Запасной старт — Исаакиевская площадь (там демо-снимки): если нет ни геопозиции, ни прошлого места
+/** Расстояние между точками, м (для «соседних кадров» с карты) */
+const distM = (a: number, b: number, c: number, d: number) => {
+  const k = Math.PI / 180;
+  const x = (d - b) * k * Math.cos(((a + c) / 2) * k);
+  const y = (c - a) * k;
+  return Math.sqrt(x * x + y * y) * 6371000;
+};
 const START: MapRegion = { latitude: 59.9341, longitude: 30.3061, latitudeDelta: 0.009, longitudeDelta: 0.009 };
 const LAST_REGION_KEY = 'dreamapp.lastMapRegion';
 // Название места в поиске — только при близком масштабе (примерно район); дальше — «Найти место»
@@ -533,7 +541,17 @@ export default function MapScreen() {
       }),
     [windowFrom],
   );
-  const openPhoto = useCallback((p: Photo) => router.push({ pathname: '/photo/[id]', params: { id: p.id } }), []);
+  // 13.10 (путь А): с карты — кадр во весь экран; листаются кадры этой точки (±120 м) за ±15 минут, по времени
+  const openPhoto = useCallback(
+    (p: Photo) => {
+      const t = new Date(p.taken_at).getTime();
+      const near = photos
+        .filter((o) => Math.abs(new Date(o.taken_at).getTime() - t) <= 15 * 60000 && distM(o.lat, o.lng, p.lat, p.lng) <= 120)
+        .sort((a, b) => +new Date(a.taken_at) - +new Date(b.taken_at));
+      openPhotoFeed(p.id, near.length ? near : [p]);
+    },
+    [photos],
+  );
   // Тап по снимку: одиночный — открыть; стопка до 5 — раскрыть веером; больше — лента момента
   const onPinPress = useCallback(
     (p: Photo) => {

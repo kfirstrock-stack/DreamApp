@@ -6,11 +6,15 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensio
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { PhotoCards } from '@/components/feed/PhotoCards';
+import { ViewToggle } from '@/components/feed/ViewToggle';
 import { PillButton } from '@/components/ui/PillButton';
 import { RoundButton } from '@/components/ui/RoundButton';
+import { SheetGrab } from '@/components/ui/SheetGrab';
 import { Stagger } from '@/components/ui/Stagger';
 import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING } from '@/lib/design';
+import { openPhotoFeed, useViewMode } from '@/lib/feed';
 import { hideAuthor, photoSource } from '@/lib/photos';
 import { compact, dayLower, fetchAuthorPhotos, fetchMatches, fetchProfile, fetchStats, monthYearUpper, nickLine, plural, type Match, type Stats } from '@/lib/profileData';
 import type { Photo, Profile } from '@/lib/types';
@@ -25,6 +29,7 @@ export default function UserScreen() {
   const [photos, setPhotos] = useState<Photo[] | null>(null);
   const [common, setCommon] = useState<Match[]>([]);
   const [menu, setMenu] = useState(false);
+  const [mode, setMode] = useViewMode(); // 13.10: «Сетка / Лента»
 
   useEffect(() => {
     if (session?.user.id === id) return void router.replace('/profile');
@@ -53,7 +58,10 @@ export default function UserScreen() {
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 9, paddingBottom: Math.max(insets.bottom, 16) + 16 }} showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
           <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
-          <RoundButton icon="more" label="Ещё" onPress={() => setMenu(true)} />
+          <View style={styles.topRight}>
+            <ViewToggle mode={mode} onChange={setMode} />
+            <RoundButton icon="more" label="Ещё" onPress={() => setMenu(true)} />
+          </View>
         </View>
 
         <Stagger i={0}>
@@ -101,9 +109,14 @@ export default function UserScreen() {
 
         </Stagger>
         <Stagger i={3}>
+        {mode === 'cards' ? (
+          <View style={{ marginTop: first ? 20 : 21 }}>
+            <PhotoCards photos={photos ?? []} onOpen={(ph) => openPhotoFeed(ph.id, photos ?? [])} showAuthor={false} inset={24} />
+          </View>
+        ) : (
         <View style={[styles.grid, { marginTop: first ? 20 : 21 }]}>
           {(photos ?? []).map((ph) => (
-            <Pressable key={ph.id} onPress={() => router.push({ pathname: '/photo/[id]', params: { id: ph.id } })} style={[styles.photo, { width: tile, height: tile }]}>
+            <Pressable key={ph.id} onPress={() => openPhotoFeed(ph.id, photos ?? [])} style={[styles.photo, { width: tile, height: tile }]}>
               <Image source={photoSource(ph.storage_path)} style={StyleSheet.absoluteFill} contentFit="cover" />
               {(ph.like_count ?? 0) > 0 && (
                 <View style={styles.likes}>
@@ -114,6 +127,7 @@ export default function UserScreen() {
             </Pressable>
           ))}
         </View>
+        )}
         </Stagger>
       </ScrollView>
 
@@ -125,7 +139,7 @@ export default function UserScreen() {
             exiting={SlideOutDown.duration(220)}
             style={[styles.menu, { paddingBottom: insets.bottom + 16 }]}
           >
-            <View style={styles.handle} />
+            <SheetGrab />
             <Pressable onPress={hide} style={({ pressed }) => [styles.menuRow, pressed && { opacity: 0.6 }]}>
               <Icon name="eyeOff" size={22} color={D.ink} />
               <Text style={styles.menuText}>Скрыть фото этого автора</Text>
@@ -154,6 +168,7 @@ function Stat({ n, label }: { n: number; label: string }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: D.paper },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 },
+  topRight: { flexDirection: 'row', gap: 12 },
   head: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, marginTop: 16 },
   avatar: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, borderColor: D.white, backgroundColor: D.paper2 },
   avatarEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: D.sun },
@@ -173,7 +188,6 @@ const styles = StyleSheet.create({
   likesText: { fontFamily: F.monoRegular, fontSize: 10, color: D.white },
   backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,14,12,0.55)', justifyContent: 'flex-end' },
   menu: { backgroundColor: D.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 10 },
-  handle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: D.line, marginBottom: 16 },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 15 },
   menuText: { flex: 1, fontFamily: F.sans, fontSize: 17, color: D.ink },
 });

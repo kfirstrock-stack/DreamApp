@@ -6,11 +6,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { PhotoCards } from '@/components/feed/PhotoCards';
+import { ViewToggle } from '@/components/feed/ViewToggle';
 import { RoundButton } from '@/components/ui/RoundButton';
 import { Stagger } from '@/components/ui/Stagger';
 import { TAB_BAR_SPACE, TabBar } from '@/components/ui/TabBar';
 import { useAuth } from '@/lib/auth';
 import { D, F } from '@/lib/design';
+import { openPhotoFeed, useViewMode } from '@/lib/feed';
 import { requestMapFocus } from '@/lib/focus';
 import { photoSource } from '@/lib/photos';
 import {
@@ -35,6 +38,7 @@ export default function ProfileScreen() {
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [photos, setPhotos] = useState<Photo[] | null>(null);
   const [since, setSince] = useState<Date | null>(null);
+  const [mode, setMode] = useViewMode(); // 13.10: «Сетка / Лента» для «Моих моментов»
 
   useFocusEffect(
     useCallback(() => {
@@ -64,6 +68,7 @@ export default function ProfileScreen() {
     <View style={styles.root}>
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 9, paddingBottom: TAB_BAR_SPACE + Math.max(insets.bottom, 12) + 24 }} showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
+          {photos && photos.length > 0 && <ViewToggle mode={mode} onChange={setMode} />}
           <RoundButton icon="settings" label="Настройки" onPress={() => router.push('/settings')} />
         </View>
 
@@ -140,6 +145,11 @@ export default function ProfileScreen() {
             </Pressable>
           )}
         </View>
+        {mode === 'cards' && photos && photos.length > 0 ? (
+          <View style={{ marginTop: 9 }}>
+            <PhotoCards photos={photos} onOpen={(p) => openPhotoFeed(p.id, photos)} showAuthor={false} />
+          </View>
+        ) : (
         <View style={styles.grid}>
           {photos && photos.length === 0 && (
             <Pressable onPress={() => router.push('/new')} style={[styles.first, { width: tile, height: tile }]} accessibilityLabel="Первый момент">
@@ -148,7 +158,7 @@ export default function ProfileScreen() {
             </Pressable>
           )}
           {(photos ?? []).map((p) => (
-            <Pressable key={p.id} onPress={() => router.push({ pathname: '/photo/[id]', params: { id: p.id } })} style={[styles.moment, { width: tile, height: tile }]}>
+            <Pressable key={p.id} onPress={() => openPhotoFeed(p.id, photos ?? [])} style={[styles.moment, { width: tile, height: tile }]}>
               <Image source={photoSource(p.storage_path)} style={StyleSheet.absoluteFill} contentFit="cover" />
               <View style={styles.year}>
                 <Text style={styles.yearText}>{new Date(p.taken_at).getFullYear()}</Text>
@@ -156,6 +166,7 @@ export default function ProfileScreen() {
             </Pressable>
           ))}
         </View>
+        )}
         </Stagger>
       </ScrollView>
 
@@ -213,7 +224,7 @@ function MatchCard({ m, w }: { m: Match; w: number }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: D.paper },
-  topRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16 },
+  topRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, paddingHorizontal: 16 },
   head: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 4 },
   avatar: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, borderColor: D.white, backgroundColor: D.paper2 },
   avatarEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: D.sun },

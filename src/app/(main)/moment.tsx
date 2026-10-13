@@ -5,10 +5,13 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { PhotoCards } from '@/components/feed/PhotoCards';
+import { ViewToggle } from '@/components/feed/ViewToggle';
 import { RoundButton } from '@/components/ui/RoundButton';
 import { TAB_BAR_SPACE, TabBar } from '@/components/ui/TabBar';
 import { useAuth } from '@/lib/auth';
 import { D, F, STEP_MIN, lightShadow } from '@/lib/design';
+import { openPhotoFeed, useViewMode } from '@/lib/feed';
 import { requestMapFocus } from '@/lib/focus';
 import { boundsAround, fetchPhotosV2, photoSource } from '@/lib/photos';
 import type { Photo } from '@/lib/types';
@@ -18,7 +21,8 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const hm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const MON = ['ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЯ', 'ИЮН', 'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК'];
 
-// B5 · Лента момента: все фото места за 15 минут, соседние интервалы — чипами
+// B5 · Лента момента: все фото места за 15 минут, соседние интервалы — чипами.
+// 13.10: «Сетка / Лента» в шапке; тап по снимку — кадр во весь экран, листаются снимки этого интервала
 export default function MomentScreen() {
   const params = useLocalSearchParams<{ lat: string; lng: string; radius?: string; from: string; title?: string }>();
   const lat = Number(params.lat), lng = Number(params.lng);
@@ -28,6 +32,7 @@ export default function MomentScreen() {
   const { session } = useAuth();
   const [start, setStart] = useState(Number(params.from));
   const [photos, setPhotos] = useState<Photo[] | null>(null);
+  const [mode, setMode] = useViewMode();
 
   // Берём ±30 минут вокруг, чтобы сразу показать счётчики соседних интервалов
   useEffect(() => {
@@ -90,7 +95,10 @@ export default function MomentScreen() {
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + TAB_BAR_SPACE + 30 }} showsVerticalScrollIndicator={false}>
         <View style={styles.headRow}>
           <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
-          <RoundButton icon="map" label="Показать на карте" onPress={showOnMap} />
+          <View style={styles.headRight}>
+            <ViewToggle mode={mode} onChange={setMode} />
+            <RoundButton icon="map" label="Показать на карте" onPress={showOnMap} />
+          </View>
         </View>
         {photos === null ? (
           // E3 · Загрузка (по макету): заглушки заголовка, строки, интервалов и сетки; кнопки сверху — живые
@@ -135,7 +143,12 @@ export default function MomentScreen() {
           </Animated.Text>
         )}
 
-        {/* Ключ по интервалу: при смене времени карточки заново «раскладываются» веером */}
+        {mode === 'cards' ? (
+          <View key={`c${start}`}>
+            <PhotoCards photos={inWindow} onOpen={(p) => openPhotoFeed(p.id, inWindow)} />
+          </View>
+        ) : (
+        /* Ключ по интервалу: при смене времени карточки заново «раскладываются» веером */
         <View key={start} style={[styles.grid, { gap }]}>
           {cols.map((col, ci) => (
             <View key={ci} style={{ width: colW, gap }}>
@@ -145,7 +158,7 @@ export default function MomentScreen() {
                   entering={FadeInDown.delay(Math.min(i, 10) * 45).springify().damping(17).stiffness(170)}
                   layout={LinearTransition}
                 >
-                  <Pressable onPress={() => router.push({ pathname: '/photo/[id]', params: { id: p.id } })} style={[styles.card, { height: h }]}>
+                  <Pressable onPress={() => openPhotoFeed(p.id, inWindow)} style={[styles.card, { height: h }]}>
                     <Image source={photoSource(p.storage_path)} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} recyclingKey={p.id} />
                     <View style={styles.cardMeta}>
                       {p.author_avatar ? <Image source={{ uri: p.author_avatar }} style={styles.ava} /> : <View style={[styles.ava, { backgroundColor: D.sun }]} />}
@@ -163,6 +176,7 @@ export default function MomentScreen() {
             </View>
           ))}
         </View>
+        )}
           </>
         )}
       </ScrollView>
@@ -182,6 +196,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: D.paper },
   sk: { backgroundColor: D.paper2 }, // E3 · заглушка
   headRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 },
+  headRight: { flexDirection: 'row', gap: 12 },
   title: { fontFamily: F.serifItalic, fontSize: 31, lineHeight: 38, color: D.ink, paddingHorizontal: 20, marginTop: 16 },
   meta: { fontFamily: F.mono, fontSize: 11, color: D.ink60, letterSpacing: 0.8, paddingHorizontal: 20, marginTop: 6 },
   chips: { gap: 8, paddingHorizontal: 20, paddingVertical: 16 },
