@@ -87,7 +87,7 @@ export async function fetchProfile(id: string): Promise<Profile | null> {
 export async function fetchAuthorPhotos(uid: string): Promise<Photo[]> {
   const { data, error } = await supabase
     .from('photos')
-    .select('id,user_id,storage_path,width,height,taken_at,lat,lng,place_name,caption,like_count,hidden')
+    .select('id,user_id,storage_path,width,height,taken_at,lat,lng,place_name,caption,like_count,hidden,private')
     .eq('user_id', uid)
     .eq('hidden', false)
     .order('taken_at', { ascending: false })

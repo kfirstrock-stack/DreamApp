@@ -12,6 +12,7 @@ export type Photo = {
   like_count?: number;
   liked_by_me?: boolean;
   hidden?: boolean;
+  private?: boolean; // «Только мне» (13.10): видит только автор
   author_username: string | null;
   author_name: string | null;
   author_avatar: string | null;

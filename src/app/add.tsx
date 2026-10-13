@@ -8,6 +8,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollVie
 import MapView, { type Region } from 'react-native-maps';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { VisibilitySwitch } from '@/components/ui/VisibilitySwitch';
 import { Icon } from '@/components/Icon';
 import { TimeWheel } from '@/components/time/TimeWheel';
 import { useAuth } from '@/lib/auth';
@@ -53,6 +54,7 @@ export default function PublishScreen() {
   const [place, setPlace] = useState<string | null>(saved?.place ?? null); // название места — в базу (группировка, поиск)
   const [address, setAddress] = useState<string | null>(saved?.address ?? null); // адрес с номером дома — в C3, как на карте C4
   const [caption, setCaption] = useState(saved?.caption ?? '');
+  const [priv, setPriv] = useState(false); // «Только мне» (13.10)
   const [pubError, setPubError] = useState<PubError | null>(null);
   const pubKey = useRef<PublishKey | null>(null); // один момент на все «Повторить»
   const [uploading, setUploading] = useState(false);
@@ -102,6 +104,7 @@ export default function PublishScreen() {
         locationSource: draft.locationSource,
         placeName: place,
         caption: caption.trim() || null,
+        private: priv,
       }, pubKey.current);
       // C6: сразу считаем, кто ещё снимал здесь ±15 минут
       const t = draft.takenAt.getTime();
@@ -169,6 +172,8 @@ export default function PublishScreen() {
       found={found.current && draft.locationSource !== 'manual' && draft.timeSource !== 'manual'}
       caption={caption}
       setCaption={setCaption}
+      priv={priv}
+      setPriv={setPriv}
       uploading={uploading}
       onPlace={() => setView('place')}
       onTime={() => setView('time')}
@@ -185,6 +190,8 @@ function Confirm(p: {
   found: boolean;
   caption: string;
   setCaption: (s: string) => void;
+  priv: boolean;
+  setPriv: (v: boolean) => void;
   uploading: boolean;
   onPlace: () => void;
   onTime: () => void;
@@ -250,10 +257,16 @@ function Confirm(p: {
           maxLength={500}
           multiline
         />
-        <Pressable onPress={p.onPublish} disabled={p.uploading} style={({ pressed }) => [styles.button, { marginTop: 22 }, pressed && { opacity: 0.88 }]}>
+        {/* 13.10 · «Видно всем / Только мне», по умолчанию — всем */}
+        <View style={{ marginTop: 16 }}>
+          <VisibilitySwitch priv={p.priv} onChange={p.setPriv} />
+        </View>
+        <Pressable onPress={p.onPublish} disabled={p.uploading} style={({ pressed }) => [styles.button, { marginTop: 20 }, pressed && { opacity: 0.88 }]}>
           {p.uploading ? <ActivityIndicator color={D.white} /> : <Text style={styles.buttonText}>Опубликовать момент</Text>}
         </Pressable>
-        <Text style={styles.footnote}>Снимок увидят все, кто откроет это место и время на карте</Text>
+        <Text style={styles.footnote}>
+          {p.priv ? 'Снимок увидите только вы — совпадения всё равно найдём' : 'Снимок увидят все, кто откроет это место и время на карте'}
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -555,7 +568,7 @@ const styles = StyleSheet.create({
   grip: { alignSelf: 'center', height: 26, paddingTop: 9 },
   // C3
   c3Title: { marginTop: 12, fontFamily: F.serifItalic, fontSize: 31, lineHeight: 40, color: D.ink },
-  preview: { marginTop: 12, height: 250, borderRadius: 24, overflow: 'hidden', backgroundColor: D.paper2 },
+  preview: { marginTop: 12, height: 200, borderRadius: 24, overflow: 'hidden', backgroundColor: D.paper2 },
   exifChip: {
     position: 'absolute',
     left: 12,

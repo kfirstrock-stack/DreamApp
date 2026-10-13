@@ -60,7 +60,7 @@ export async function fetchTimeBuckets(b: Bounds, g: Granularity, from: Date, to
 }
 
 const SELECT_WITH_AUTHOR =
-  'id,user_id,storage_path,width,height,taken_at,lat,lng,place_name,caption,profiles!photos_user_id_fkey(username,display_name,avatar_url)';
+  'id,user_id,storage_path,width,height,taken_at,lat,lng,place_name,caption,private,profiles!photos_user_id_fkey(username,display_name,avatar_url)';
 
 function flatten(row: any): Photo {
   const { profiles, ...rest } = row;
@@ -107,6 +107,7 @@ export type NewPhoto = {
   locationSource: 'exif' | 'device' | 'manual';
   placeName: string | null;
   caption: string | null;
+  private?: boolean; // «Только мне»
 };
 
 /** Одна публикация = один id момента и один путь файла на все повторы (12.10).
@@ -145,6 +146,7 @@ export async function uploadPhoto(userId: string, p: NewPhoto, key?: PublishKey)
     location_source: p.locationSource,
     place_name: p.placeName,
     caption: p.caption,
+    private: !!p.private,
   });
   if (error) {
     if (error.code === '23505') return k.id; // момент уже записан прошлой попыткой
@@ -200,7 +202,7 @@ export function boundsAround(lat: number, lng: number, meters: number): Bounds {
 export async function fetchPhotoFull(id: string, userId?: string | null): Promise<Photo | null> {
   const { data, error } = await supabase
     .from('photos')
-    .select('id,user_id,storage_path,width,height,taken_at,lat,lng,place_name,caption,like_count,hidden,profiles!photos_user_id_fkey(username,display_name,avatar_url)')
+    .select('id,user_id,storage_path,width,height,taken_at,lat,lng,place_name,caption,like_count,hidden,private,profiles!photos_user_id_fkey(username,display_name,avatar_url)')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
@@ -220,6 +222,14 @@ export async function fetchPhotoFull(id: string, userId?: string | null): Promis
   };
   cachePhotos([p]);
   return p;
+}
+
+/** «Только мне» / «Видно всем» для своего снимка (13.10) */
+export async function setPhotoPrivate(photoId: string, on: boolean) {
+  const { error } = await supabase.from('photos').update({ private: on }).eq('id', photoId);
+  if (error) throw error;
+  const c = cache.get(photoId);
+  if (c) c.private = on;
 }
 
 export async function setLike(photoId: string, userId: string, like: boolean) {

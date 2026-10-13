@@ -33,7 +33,7 @@ import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING, STEP_MIN } from '@/lib/design';
 import { ago, feedList } from '@/lib/feed';
 import {
-  boundsAround, cachedPhoto, deletePhoto, fetchPhotoFull, fetchPhotosV2, hideAuthor, photoSource, reportPhoto, setLike, type ReportReason,
+  boundsAround, cachedPhoto, deletePhoto, fetchPhotoFull, fetchPhotosV2, hideAuthor, photoSource, reportPhoto, setLike, setPhotoPrivate, type ReportReason,
 } from '@/lib/photos';
 import type { Photo } from '@/lib/types';
 
@@ -362,6 +362,13 @@ export default function PhotoScreen() {
           <Text style={styles.headSub} numberOfLines={1}>
             {sub}
           </Text>
+          {/* 13.10 · свой скрытый снимок — пометка «Только мне» */}
+          {mine && cur.private ? (
+            <View style={styles.privPill}>
+              <Icon name="lock" size={14} color={D.white} />
+              <Text style={styles.privText}>Только мне</Text>
+            </View>
+          ) : null}
         </View>
         {/* F1 · одна кнопка меню: поделиться, пожаловаться, скрыть автора */}
         <RoundButton icon="more" tone="glass" label="Меню" onPress={() => setMenu('actions')} />
@@ -410,6 +417,21 @@ export default function PhotoScreen() {
                     Share.share({ message: `Момент в DreamApp: ${cur.place_name ?? ''}, ${stamp(taken)}` });
                   }}
                 />
+                {mine && (
+                  <MenuRow
+                    icon="lock"
+                    label={cur.private ? 'Сделать видимым всем' : 'Сделать «Только мне»'}
+                    onPress={() => {
+                      const on = !cur.private;
+                      setMenu(null);
+                      patch({ ...cur, private: on });
+                      setPhotoPrivate(cur.id, on).catch((e) => {
+                        patch({ ...cur, private: !on });
+                        Alert.alert('Не получилось', e?.message ?? '');
+                      });
+                    }}
+                  />
+                )}
                 {!mine && <MenuRow icon="flag" label="Пожаловаться на фото" chevron onPress={() => setMenu('report')} />}
                 {!mine && (
                   <MenuRow
@@ -896,6 +918,8 @@ const styles = StyleSheet.create({
   topRow: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 12, zIndex: 10 },
   head: { flex: 1, paddingTop: 4, gap: 2 },
   headTitle: { fontFamily: F.sansSemi, fontSize: 16, color: D.white },
+  privPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, paddingLeft: 10, paddingRight: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(15,14,12,0.45)' },
+  privText: { fontFamily: F.sansSemi, fontSize: 12, color: D.white },
   headSub: { fontFamily: F.monoRegular, fontSize: 11, letterSpacing: 0.44, color: 'rgba(255,255,255,0.75)' },
   rail: { position: 'absolute', right: 16, width: 44, alignItems: 'center', gap: 22 },
   railItem: { alignItems: 'center', gap: 4, minWidth: 44, minHeight: 44 },

@@ -163,6 +163,12 @@ export default function ProfileScreen() {
               <View style={styles.year}>
                 <Text style={styles.yearText}>{new Date(p.taken_at).getFullYear()}</Text>
               </View>
+              {/* 13.10 · «Только мне» — замочек в углу */}
+              {p.private && (
+                <View style={styles.lock} accessibilityLabel="Только мне">
+                  <Icon name="lock" size={14} color={D.white} />
+                </View>
+              )}
             </Pressable>
           ))}
         </View>
@@ -249,6 +255,7 @@ const styles = StyleSheet.create({
   emptyText: { fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: D.ink60 },
   momentsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, paddingRight: 23 },
   link: { fontFamily: F.sansSemi, fontSize: 13, color: D.sun },
+  lock: { position: 'absolute', left: 6, top: 6, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(15,14,12,0.55)', alignItems: 'center', justifyContent: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, marginTop: 9 },
   moment: { borderRadius: 14, overflow: 'hidden', backgroundColor: D.paper2 },
   year: { position: 'absolute', left: 6, bottom: 6, backgroundColor: 'rgba(15,14,12,0.5)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
