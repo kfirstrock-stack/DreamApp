@@ -1,7 +1,7 @@
 // Данные раздела D: счётчики профиля, совпадения, скрытые авторы, удаление аккаунта
 import { supabase } from './supabase';
 import type { Photo, Profile } from './types';
-import { cachePhotos } from './photos';
+import { cachePhotos, removeAllMyFiles } from './photos';
 
 export type Stats = { moments: number; likes: number; places: number };
 
@@ -132,16 +132,7 @@ export async function fetchMatchesEnabled(uid: string): Promise<boolean> {
 
 /** D6: стираем свои файлы в хранилище (снимки и все аватары), затем аккаунт — остальное удалится каскадом */
 export async function deleteAccount(uid: string) {
-  const bucket = supabase.storage.from('photos');
-  for (;;) {
-    const { data, error } = await bucket.list(uid, { limit: 100 });
-    if (error) throw error;
-    const files = (data ?? []).filter((f) => f.id).map((f) => `${uid}/${f.name}`);
-    if (!files.length) break;
-    const rm = await bucket.remove(files);
-    if (rm.error) throw rm.error;
-    if (files.length < 100) break;
-  }
+  await removeAllMyFiles(uid);
   const { error } = await supabase.rpc('delete_my_account');
   if (error) throw error;
   await supabase.auth.signOut();

@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { loadLastUser, saveLastUser, type LastShot } from './lastUser';
+import { syncPrivateFiles } from './photos';
 import { supabase } from './supabase';
 import type { Profile } from './types';
 
@@ -45,6 +46,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, [loadProfile]);
 
+  // 21.10: файлы скрытых снимков — в закрытое хранилище (старые и прерванные переносы)
+  useEffect(() => {
+    if (session?.user.id) syncPrivateFiles(session.user.id);
+  }, [session?.user.id]);
+
   // запоминаем вошедшего (с готовым профилем) для экрана «С возвращением»
   // 13.10: заодно — три последних снимка для полароидов на «С возвращением»
   useEffect(() => {
@@ -56,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .from('photos')
       .select('storage_path,taken_at,place_name')
       .eq('user_id', uid)
+      .eq('private', false) // экран «С возвращением» открыт до входа — скрытые снимки там не показать
       .order('taken_at', { ascending: false })
       .limit(3)
       .then(async ({ data, error }) => {

@@ -425,10 +425,13 @@ export default function PhotoScreen() {
                       const on = !cur.private;
                       setMenu(null);
                       patch({ ...cur, private: on });
-                      setPhotoPrivate(cur.id, on).catch((e) => {
-                        patch({ ...cur, private: !on });
-                        Alert.alert('Не получилось', e?.message ?? '');
-                      });
+                      setPhotoPrivate(cur, on).then(
+                        (storage_path) => patch({ ...cur, private: on, storage_path }),
+                        (e) => {
+                          patch({ ...cur, private: !on });
+                          Alert.alert('Не получилось', e?.message ?? '');
+                        },
+                      );
                     }}
                   />
                 )}
