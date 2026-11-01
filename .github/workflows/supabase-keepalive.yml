@@ -1,11 +1,12 @@
 # Supabase на бесплатном плане ставит проект на паузу после ~7 дней без активности.
-# Раз в три дня делаем один лёгкий запрос на чтение — этого достаточно, чтобы проект не засыпал.
+# Каждый день делаем лёгкий запрос на чтение, чтобы проект не засыпал (с 01.11 — ежедневно: раз в три дня не хватило).
+# Если запрос не прошёл — придёт письмо от GitHub: значит, проект на паузе, его нужно восстановить в панели Supabase.
 # Ключ — публичный (publishable), он и так лежит в приложении; данные под защитой правил доступа.
 name: Supabase keepalive
 
 on:
   schedule:
-    - cron: '17 6 */3 * *' # раз в 3 дня, 06:17 UTC
+    - cron: '17 6 * * *' # каждый день, 06:17 UTC (09:17 по Москве)
   workflow_dispatch: {}
 
 jobs:
@@ -14,8 +15,8 @@ jobs:
     steps:
       - name: Лёгкий запрос к базе
         run: |
-          code=$(curl -sS -o /dev/null -w "%{http_code}" \
+          code=$(curl -sS -o /dev/null -w "%{http_code}" --retry 3 --retry-delay 20 \
             "https://xxuzjmjkgfjxmdqehvap.supabase.co/rest/v1/photos?select=id&limit=1" \
-            -H "apikey: sb_publishable_-P83XQ3cpD__9W51C4eQvA_L01uwA08")
+            -H "apikey: sb_publishable_-P83XQ3cpD__9W51C4eQvA_L01uwA08") || true
           echo "HTTP $code"
-          test "$code" = "200"
+          if [ "$code" != "200" ]; then echo "::error::Supabase не отвечает — похоже, проект на паузе. Восстановите его в панели Supabase."; exit 1; fi
