@@ -30,3 +30,4 @@ Expo (React Native) · Expo Router · Reanimated · Supabase (PostGIS)
 - Ключи: в приложении только publishable-ключ (см. `.env.example`). `service_role` и пароль БД в репозиторий не попадают.
 - Бэкап данных (таблицы в CSV и публичные файлы) делается вручную и хранится вне репозитория — в нём личные данные.
 
+- Проект на Free-тарифе засыпает без активности: ежедневный запрос из GitHub Actions (`.github/workflows/supabase-keepalive.yml`) держит его живым. Если письмо от GitHub об ошибке — проект на паузе, восстановить в панели Supabase.
