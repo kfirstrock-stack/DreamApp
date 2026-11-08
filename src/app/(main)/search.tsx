@@ -2,7 +2,7 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, type TextInputInstance, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -20,7 +20,7 @@ export default function SearchScreen() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [recent, setRecent] = useState<Recent[]>([]);
   const [popular, setPopular] = useState<Popular[]>([]);
-  const input = useRef<TextInput>(null);
+  const input = useRef<TextInputInstance>(null);
 
   useEffect(() => {
     loadRecent().then(setRecent);

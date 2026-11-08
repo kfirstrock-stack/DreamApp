@@ -1,6 +1,6 @@
 // C4 · поиск места снимка (утверждено 12.10): как B4, но только найденные места; выбор — карта C4 переезжает туда
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, type TextInputInstance, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -11,7 +11,7 @@ export function PlaceSearch({ near, onPick, onCancel }: { near: { lat: number; l
   const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
   const [places, setPlaces] = useState<Place[]>([]);
-  const input = useRef<TextInput>(null);
+  const input = useRef<TextInputInstance>(null);
 
   // по мере ввода, с паузой 250 мс; старый запрос отменяется
   useEffect(() => {

@@ -7,7 +7,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, Share, StyleSheet, Text, View, useWindowDimensions, type ViewToken } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, Share, StyleSheet, Text, View, useWindowDimensions, type ListViewToken } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -227,7 +227,7 @@ export default function PhotoScreen() {
     return { opacity: 1 - k * 0.6, transform: [{ translateX: swipeX.value }, { scale: 1 - k * 0.08 }] };
   });
 
-  const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+  const onViewable = useRef(({ viewableItems }: { viewableItems: ListViewToken[] }) => {
     const v = viewableItems.find((x) => x.isViewable);
     if (v?.index != null) setIndex(v.index);
   }).current;

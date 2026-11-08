@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, type TextInputInstance, View, useWindowDimensions } from 'react-native';
 import Animated, { Easing, Extrapolation, interpolate, type SharedValue, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -392,7 +392,7 @@ function CodeStep({ email, onBack, onResend }: { email: string; onBack: () => vo
   const [busy, setBusy] = useState(false);
   const [wrong, setWrong] = useState(false);
   const [left, setLeft] = useState(RESEND);
-  const input = useRef<TextInput>(null);
+  const input = useRef<TextInputInstance>(null);
   const cell = (width - 64 - 6 * (CODE - 1)) / CODE;
 
   useEffect(() => {
