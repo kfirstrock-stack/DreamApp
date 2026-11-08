@@ -162,7 +162,7 @@ export default function MapScreen() {
 
   // Регион, при котором точка встаёт посередине свободной зоны — между поиском и карточкой шкалы
   const focusRegion = useCallback(
-    (lat: number, lng: number, lngDelta = 0.006): MapRegion => {
+    (lat: number, lng: number, lngDelta = 0.012): MapRegion => {
       const w = size.w || 393, h = size.h || 852;
       const latDelta = lngDelta * (h / w) * Math.cos((lat * Math.PI) / 180);
       const freeTop = insets.top + 74;
