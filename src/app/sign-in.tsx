@@ -77,7 +77,9 @@ export default function SignIn() {
     if (!/^\S+@\S+\.\S+$/.test(e)) return setError('Проверьте адрес почты');
     setBusy(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithOtp({ email: e, options: { shouldCreateUser: true } });
+    // без ответа дольше 20 с — считаем, что связи нет, и не крутим кружок вечно
+    const timeout = new Promise<{ error: { message: string } }>((r) => setTimeout(() => r({ error: { message: 'timeout' } }), 20000));
+    const { error } = await Promise.race([supabase.auth.signInWithOtp({ email: e, options: { shouldCreateUser: true } }), timeout]);
     setBusy(false);
     if (error) return setError(/rate|seconds/i.test(error.message) ? 'Слишком часто. Подождите минуту и попробуйте снова.' : 'Не получилось отправить код. Проверьте интернет.');
     setStep('code');
