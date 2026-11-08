@@ -3,7 +3,8 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, type TextInputInstance, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, type TextInputInstance, View, useWindowDimensions } from 'react-native';
+import { Text, TextInput } from '@/components/ui/Text';
 import Animated, { Easing, Extrapolation, interpolate, type SharedValue, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -290,14 +291,14 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter, returning, onO
       </View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.bottom} keyboardVerticalOffset={-insets.bottom + 16}>
         <View onLayout={(e) => !kbOpen.current && setTextTop(height - e.nativeEvent.layout.height)} style={{ paddingHorizontal: 32, paddingBottom: Math.max(insets.bottom - 3 - 13, 0) }}>
-          <Animated.Text style={[styles.brand, t1]}>DreamApp</Animated.Text>
+          <Animated.Text allowFontScaling={false} style={[styles.brand, t1]}>DreamApp</Animated.Text>
           {/* №7: видимый текст пересоздаётся при смене (key), а высоты меряют невидимые копии вне обрезки —
               иначе iOS оставлял старую раскладку и строки резались и справа, и снизу */}
           <Animated.View style={[{ overflow: 'hidden' }, titleKb]}>
-            <Animated.Text key={titleText} style={[styles.a4Title, t2]}>{titleText}</Animated.Text>
+            <Animated.Text allowFontScaling={false} key={titleText} style={[styles.a4Title, t2]}>{titleText}</Animated.Text>
           </Animated.View>
           <Animated.View style={[{ overflow: 'hidden' }, bodyKb]}>
-            <Animated.Text key={bodyText} style={[styles.a4Body, t3]}>{bodyText}</Animated.Text>
+            <Animated.Text allowFontScaling={false} key={bodyText} style={[styles.a4Body, t3]}>{bodyText}</Animated.Text>
           </Animated.View>
           <View onLayout={(e) => (lowerH.current = e.nativeEvent.layout.height)}>
           <Animated.View style={t4}>

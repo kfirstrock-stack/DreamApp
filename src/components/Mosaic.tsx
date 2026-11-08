@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import { photoSource } from '@/lib/photos';
 import { colors, radius, shadow } from '@/lib/theme';
 import { dateTime } from '@/lib/time';

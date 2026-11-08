@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { memo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import Animated, { useAnimatedStyle, useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import { D, F } from '@/lib/design';
 import { project, type MapRegion } from '@/lib/geo';

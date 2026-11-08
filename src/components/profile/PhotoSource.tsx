@@ -1,6 +1,7 @@
 // Шторка «Фото профиля» (A6, D4; утверждено 11.10) — как C2: «Снять» и «Из галереи».
 // Закрыть — смахнуть вниз или тап по затемнению.
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

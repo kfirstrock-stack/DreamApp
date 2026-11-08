@@ -2,7 +2,8 @@
 import Constants from 'expo-constants';
 import { router, useFocusEffect } from 'expo-router';
 import { type ReactNode, useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';

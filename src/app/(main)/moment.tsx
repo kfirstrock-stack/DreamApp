@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -138,7 +139,7 @@ export default function MomentScreen() {
         </ScrollView>
 
         {photos !== null && inWindow.length === 0 && (
-          <Animated.Text entering={FadeIn} style={styles.empty}>
+          <Animated.Text allowFontScaling={false} entering={FadeIn} style={styles.empty}>
             В эти 15 минут здесь никого. Загляните в соседние интервалы — они выше.
           </Animated.Text>
         )}

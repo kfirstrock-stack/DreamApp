@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { memo, useMemo, type ReactNode } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,

@@ -4,7 +4,8 @@ import { PlayfairDisplay_400Regular, PlayfairDisplay_400Regular_Italic } from '@
 import { useFonts } from 'expo-font';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import MapView from 'react-native-maps';
 import { useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

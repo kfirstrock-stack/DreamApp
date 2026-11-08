@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { D, F } from '@/lib/design';
 import { Icon, type IconName } from '../Icon';

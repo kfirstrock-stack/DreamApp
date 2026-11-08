@@ -1,6 +1,7 @@
 // «Видно всем / Только мне» (утверждено 13.10): белая пилюля 44 pt, выбранный сегмент — тёмный
 import * as Haptics from 'expo-haptics';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import { D, F } from '@/lib/design';
 
 export function VisibilitySwitch({ priv, onChange }: { priv: boolean; onChange: (priv: boolean) => void }) {

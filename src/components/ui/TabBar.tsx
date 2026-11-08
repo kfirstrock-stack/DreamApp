@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { D, F, softShadow } from '@/lib/design';
@@ -27,7 +28,7 @@ export function TabBar({ active, onMap, onMoments, onAdd, onProfile }: Props) {
         <Animated.View layout={LAYOUT} style={[styles.item, on && styles.itemOn]}>
           <Icon name={icon} size={21} color={on ? D.ink : D.paper} />
           {on && (
-            <Animated.Text entering={FadeIn.duration(180)} exiting={FadeOut.duration(80)} style={styles.label}>
+            <Animated.Text allowFontScaling={false} entering={FadeIn.duration(180)} exiting={FadeOut.duration(80)} style={styles.label}>
               {label}
             </Animated.Text>
           )}

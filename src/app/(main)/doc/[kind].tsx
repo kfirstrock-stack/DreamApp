@@ -1,6 +1,7 @@
 // D7 · Правила сообщества / D8 · Конфиденциальность — экран с текстом в стиле D5
 import { router, useLocalSearchParams } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoundButton } from '@/components/ui/RoundButton';
 import { Stagger } from '@/components/ui/Stagger';

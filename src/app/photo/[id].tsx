@@ -7,7 +7,8 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, Share, StyleSheet, Text, View, useWindowDimensions, type ListViewToken } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, Share, StyleSheet, View, useWindowDimensions, type ListViewToken } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,

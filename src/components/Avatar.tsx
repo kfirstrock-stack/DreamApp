@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import { colors } from '@/lib/theme';
 
 export function Avatar({ name, url, size = 40 }: { name?: string | null; url?: string | null; size?: number }) {

@@ -1,7 +1,8 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useEffect, useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import Animated, {
   Easing,
   interpolate,

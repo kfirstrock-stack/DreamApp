@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import Animated, {
   Easing,
   useAnimatedReaction,
@@ -39,7 +40,7 @@ function Cell({ j, pos, h, size, color }: { j: number; pos: SharedValue<number>;
     return { opacity: d >= 1 ? 0 : 1 - d * 0.9 };
   });
   return (
-    <Animated.Text style={[styles.digit, { fontSize: size, lineHeight: h, height: h, color }, style]}>{j % 10}</Animated.Text>
+    <Animated.Text allowFontScaling={false} style={[styles.digit, { fontSize: size, lineHeight: h, height: h, color }, style]}>{j % 10}</Animated.Text>
   );
 }
 

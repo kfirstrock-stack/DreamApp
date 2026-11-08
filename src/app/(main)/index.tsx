@@ -4,7 +4,8 @@ import * as Location from 'expo-location';
 import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import { Image } from 'expo-image';
 import MapView from 'react-native-maps';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -820,7 +821,7 @@ export default function MapScreen() {
                 {clockStep ? (
                   <RollingTime key={step} index={indexSV} initial={index} step={step === 'hour' ? 60 : STEP_MIN} size={50} />
                 ) : (
-                  <Animated.Text key={`${step}${start.getTime()}${index}`} entering={FadeIn.duration(220)} style={styles.bigLabel}>
+                  <Animated.Text allowFontScaling={false} key={`${step}${start.getTime()}${index}`} entering={FadeIn.duration(220)} style={styles.bigLabel}>
                     {bigLabel(step, start, index)}
                   </Animated.Text>
                 )}

@@ -4,7 +4,8 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Children, type ReactNode, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -157,8 +158,8 @@ function Skip({ progress, active, onPress }: { progress: P; active: boolean; onP
   return (
     <Animated.View pointerEvents={active ? 'auto' : 'none'} style={[styles.skip, { top: insets.top + 11 }, wrap]}>
       <Pressable onPress={onPress} hitSlop={12}>
-        <Animated.Text style={[styles.skipText, { color: D.ink60 }, dark]}>Пропустить</Animated.Text>
-        <Animated.Text style={[styles.skipText, styles.skipOver, { color: 'rgba(244,239,230,0.8)' }, light]}>Пропустить</Animated.Text>
+        <Animated.Text allowFontScaling={false} style={[styles.skipText, { color: D.ink60 }, dark]}>Пропустить</Animated.Text>
+        <Animated.Text allowFontScaling={false} style={[styles.skipText, styles.skipOver, { color: 'rgba(244,239,230,0.8)' }, light]}>Пропустить</Animated.Text>
       </Pressable>
     </Animated.View>
   );
@@ -193,7 +194,7 @@ function Letter({ ch, i, progress, word }: { ch: string; i: number; progress: P;
     };
   });
   return (
-    <Animated.Text
+    <Animated.Text allowFontScaling={false}
       style={[styles.buttonText, st]}
       onLayout={(e) => {
         const { x, width } = e.nativeEvent.layout;

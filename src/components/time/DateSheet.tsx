@@ -1,7 +1,8 @@
 // B3 · «Когда?» — выбор даты и времени (макет B3 + утверждённые B3·час / день / неделя, 09.10)
 import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -256,7 +257,7 @@ function WheelItem({ i, y, label }: { i: number; y: SharedValue<number>; label: 
   });
   return (
     <View style={styles.item}>
-      <Animated.Text style={[styles.itemText, style]}>{label}</Animated.Text>
+      <Animated.Text allowFontScaling={false} style={[styles.itemText, style]}>{label}</Animated.Text>
     </View>
   );
 }

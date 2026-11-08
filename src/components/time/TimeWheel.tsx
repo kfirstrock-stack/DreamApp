@@ -62,7 +62,7 @@ function Row({ i, y, item, size, label }: { i: number; y: SharedValue<number>; i
   });
   return (
     <View style={{ height: item, alignItems: 'center', justifyContent: 'center' }}>
-      <Animated.Text style={[{ fontFamily: F.mono, fontSize: size, color: D.ink }, style]}>{label}</Animated.Text>
+      <Animated.Text allowFontScaling={false} style={[{ fontFamily: F.mono, fontSize: size, color: D.ink }, style]}>{label}</Animated.Text>
     </View>
   );
 }
