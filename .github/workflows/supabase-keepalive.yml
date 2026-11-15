@@ -1,22 +1,32 @@
-# Supabase на бесплатном плане ставит проект на паузу после ~7 дней без активности.
-# Каждый день делаем лёгкий запрос на чтение, чтобы проект не засыпал (с 01.11 — ежедневно: раз в три дня не хватило).
-# Если запрос не прошёл — придёт письмо от GitHub: значит, проект на паузе, его нужно восстановить в панели Supabase.
-# Ключ — публичный (publishable), он и так лежит в приложении; данные под защитой правил доступа.
+# Supabase Free plan pauses a project after ~7 days of "insufficient activity".
+# A single table read was not enough (Supabase warning email 2026-11-15 despite daily runs),
+# so every day we touch the database (PostGIS function), a table read, auth and storage.
+# If a check fails, GitHub sends an email: the project is probably paused, restore it in the Supabase dashboard.
+# The key is public (publishable): it is already inside the app; data is protected by RLS.
 name: Supabase keepalive
 
 on:
   schedule:
-    - cron: '17 6 * * *' # каждый день, 06:17 UTC (09:17 по Москве)
+    - cron: '17 6 * * *'
   workflow_dispatch: {}
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Лёгкий запрос к базе
+      - name: Light requests to database, auth and storage
         run: |
-          code=$(curl -sS -o /dev/null -w "%{http_code}" --retry 3 --retry-delay 20 \
-            "https://xxuzjmjkgfjxmdqehvap.supabase.co/rest/v1/photos?select=id&limit=1" \
-            -H "apikey: sb_publishable_-P83XQ3cpD__9W51C4eQvA_L01uwA08") || true
-          echo "HTTP $code"
-          if [ "$code" != "200" ]; then echo "::error::Supabase не отвечает — похоже, проект на паузе. Восстановите его в панели Supabase."; exit 1; fi
+          U=https://xxuzjmjkgfjxmdqehvap.supabase.co
+          K=sb_publishable_-P83XQ3cpD__9W51C4eQvA_L01uwA08
+          fail=0
+          check() {
+            name=$1; want=$2; shift 2
+            code=$(curl -sS -o /dev/null -w "%{http_code}" --retry 3 --retry-delay 20 "$@" -H "apikey: $K") || true
+            echo "$name: HTTP $code"
+            [ "$code" = "$want" ] || fail=1
+          }
+          check "table photos" 200 "$U/rest/v1/photos?select=id&limit=1"
+          check "db function photo_count_near" 200 -X POST "$U/rest/v1/rpc/photo_count_near" -H "Content-Type: application/json" -d '{"lat":59.9341,"lng":30.3061,"radius_m":1000}'
+          check "auth" 200 "$U/auth/v1/settings"
+          check "storage" 200 -X POST "$U/storage/v1/object/list/photos" -H "Content-Type: application/json" -d '{"prefix":"","limit":1}'
+          if [ "$fail" != "0" ]; then echo "::error::Supabase is not responding - the project is probably paused. Restore it in the Supabase dashboard."; exit 1; fi
