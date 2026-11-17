@@ -1,32 +1,45 @@
-# Supabase Free plan pauses a project after ~7 days of "insufficient activity".
-# A single table read was not enough (Supabase warning email 2026-11-15 despite daily runs),
-# so every day we touch the database (PostGIS function), a table read, auth and storage.
-# If a check fails, GitHub sends an email: the project is probably paused, restore it in the Supabase dashboard.
-# The key is public (publishable): it is already inside the app; data is protected by RLS.
+# Free Supabase projects pause after about a week without activity.
+# These requests are read-only GETs: a row from `photos` (hits the database)
+# and auth health. No writes.
+# A table read alone was not enough in November 2026, so each run touches both.
+# GitHub disables scheduled workflows after 60 days without a commit in the repo.
+# Once a month this job writes .github/keepalive.txt so the schedule stays on.
 name: Supabase keepalive
 
 on:
   schedule:
-    - cron: '17 6 * * *'
+    # 06:17 UTC every other day (1st, 3rd, 5th, …)
+    - cron: '17 6 */2 * *'
   workflow_dispatch: {}
+
+permissions:
+  contents: write
 
 jobs:
   ping:
     runs-on: ubuntu-latest
+    env:
+      PROD_URL: https://xxuzjmjkgfjxmdqehvap.supabase.co
+      PROD_ANON_KEY: sb_publishable_-P83XQ3cpD__9W51C4eQvA_L01uwA08
+      TEST_URL: https://wmyinjftktwvjvcvclph.supabase.co
+      TEST_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndteWluamZ0a3R3dmp2Y3ZjbHBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ4OTIyMzIsImV4cCI6MjExMDQ2ODIzMn0.wkpsyfbCEEb-f-bDSbxzQ8mW1wq8HbBUTzgloyHTcFg
     steps:
-      - name: Light requests to database, auth and storage
+      - uses: actions/checkout@v4
+
+      - name: Read-only GET to prod and test
+        run: bash scripts/keepalive.sh
+
+      - name: Monthly heartbeat so GitHub does not disable the schedule
         run: |
-          U=https://xxuzjmjkgfjxmdqehvap.supabase.co
-          K=sb_publishable_-P83XQ3cpD__9W51C4eQvA_L01uwA08
-          fail=0
-          check() {
-            name=$1; want=$2; shift 2
-            code=$(curl -sS -o /dev/null -w "%{http_code}" --retry 3 --retry-delay 20 "$@" -H "apikey: $K") || true
-            echo "$name: HTTP $code"
-            [ "$code" = "$want" ] || fail=1
-          }
-          check "table photos" 200 "$U/rest/v1/photos?select=id&limit=1"
-          check "db function photo_count_near" 200 -X POST "$U/rest/v1/rpc/photo_count_near" -H "Content-Type: application/json" -d '{"lat":59.9341,"lng":30.3061,"radius_m":1000}'
-          check "auth" 200 "$U/auth/v1/settings"
-          check "storage" 200 -X POST "$U/storage/v1/object/list/photos" -H "Content-Type: application/json" -d '{"prefix":"","limit":1}'
-          if [ "$fail" != "0" ]; then echo "::error::Supabase is not responding - the project is probably paused. Restore it in the Supabase dashboard."; exit 1; fi
+          month=$(date -u +%Y-%m)
+          current=$(cat .github/keepalive.txt 2>/dev/null || true)
+          if [ "$current" = "$month" ]; then
+            echo "Heartbeat already $month"
+            exit 0
+          fi
+          echo "$month" > .github/keepalive.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/keepalive.txt
+          git commit -m "keepalive: $month"
+          git push

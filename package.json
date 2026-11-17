@@ -52,7 +52,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "keepalive": "curl -fsS -o /dev/null -w \"таблица: HTTP %{http_code}\\n\" \"https://xxuzjmjkgfjxmdqehvap.supabase.co/rest/v1/photos?select=id&limit=1\" -H \"apikey: sb_publishable_-P83XQ3cpD__9W51C4eQvA_L01uwA08\" && curl -fsS -o /dev/null -w \"функция БД: HTTP %{http_code}\\n\" -X POST \"https://xxuzjmjkgfjxmdqehvap.supabase.co/rest/v1/rpc/photo_count_near\" -H \"apikey: sb_publishable_-P83XQ3cpD__9W51C4eQvA_L01uwA08\" -H \"Content-Type: application/json\" -d '{\"lat\":59.9341,\"lng\":30.3061,\"radius_m\":1000}' && curl -fsS -o /dev/null -w \"авторизация: HTTP %{http_code}\\n\" \"https://xxuzjmjkgfjxmdqehvap.supabase.co/auth/v1/settings\" -H \"apikey: sb_publishable_-P83XQ3cpD__9W51C4eQvA_L01uwA08\""
+    "keepalive": "bash scripts/keepalive.sh"
   },
   "private": true
 }
