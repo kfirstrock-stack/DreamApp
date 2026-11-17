@@ -41,6 +41,3 @@ example
 # generated native folders
 /ios
 /android
-
-# Демо-снимки из макета — только локально, в репозиторий не кладём
-assets/demo/

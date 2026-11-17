@@ -1,5 +1,5 @@
-// Демо-снимки, встроенные в приложение (только для тестов; перед релизом удалить вместе с assets/demo).
-// Сгенерировано из scripts/fetch-demo-photos.sh.
+// Демо-снимки Исаакиевской площади и собора. Источники и лицензии: assets/demo/ATTRIBUTIONS.md.
+// Перед релизом удалить вместе с assets/demo.
 export const DEMO_IMAGES: Record<string, number> = {
   'demo-01': require('../../assets/demo/demo-01.jpg'),
   'demo-02': require('../../assets/demo/demo-02.jpg'),
