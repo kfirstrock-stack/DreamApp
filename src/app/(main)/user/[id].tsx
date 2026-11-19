@@ -84,7 +84,7 @@ export default function UserScreen() {
                 {nickLine(p)}
               </Text>
             ) : null}
-            <Text style={styles.since}>{p?.created_at ? `В DREAMAPP С ${monthYearUpper(new Date(p.created_at))}` : ' '}</Text>
+            <Text style={styles.since}>{p?.created_at ? `В GLIMIKA С ${monthYearUpper(new Date(p.created_at))}` : ' '}</Text>
           </View>
         </View>
 

@@ -20,10 +20,10 @@ export default function MenuScreen() {
     { icon: 'camera', label: 'Добавить фото', onPress: () => router.replace(session ? '/add' : '/sign-in') },
     {
       icon: 'info',
-      label: 'О DreamApp',
+      label: 'О Glimika',
       onPress: () =>
         Alert.alert(
-          'DreamApp',
+          'Glimika',
           'Живая история мест в фотографиях. Выкладывайте снимки с местом и временем — и, возможно, найдёте себя на чужих фото.',
         ),
     },

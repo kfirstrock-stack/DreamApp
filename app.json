@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "DreamApp",
+    "name": "Glimika",
     "slug": "DreamApp",
     "version": "1.0.0",
     "orientation": "default",
@@ -40,21 +40,21 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "DreamApp открывает ваши фото, чтобы вы могли опубликовать их на карте.",
-          "cameraPermission": "DreamApp использует камеру, чтобы снимать фото для карты."
+          "photosPermission": "Glimika открывает ваши фото, чтобы вы могли опубликовать их на карте.",
+          "cameraPermission": "Glimika использует камеру, чтобы снимать фото для карты."
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "DreamApp показывает ваши недавние снимки, чтобы их можно было выложить на карту.",
-          "savePhotosPermission": "DreamApp сохраняет снимки в вашу галерею."
+          "photosPermission": "Glimika показывает ваши недавние снимки, чтобы их можно было выложить на карту.",
+          "savePhotosPermission": "Glimika сохраняет снимки в вашу галерею."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "DreamApp определяет, где сделан снимок, и показывает фото рядом с вами."
+          "locationWhenInUsePermission": "Glimika определяет, где сделан снимок, и показывает фото рядом с вами."
         }
       ]
     ],

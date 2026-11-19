@@ -291,7 +291,7 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter, returning, onO
       </View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.bottom} keyboardVerticalOffset={-insets.bottom + 16}>
         <View onLayout={(e) => !kbOpen.current && setTextTop(height - e.nativeEvent.layout.height)} style={{ paddingHorizontal: 32, paddingBottom: Math.max(insets.bottom - 3 - 13, 0) }}>
-          <Animated.Text allowFontScaling={false} style={[styles.brand, t1]}>DreamApp</Animated.Text>
+          <Animated.Text allowFontScaling={false} style={[styles.brand, t1]}>Glimika</Animated.Text>
           {/* №7: видимый текст пересоздаётся при смене (key), а высоты меряют невидимые копии вне обрезки —
               иначе iOS оставлял старую раскладку и строки резались и справа, и снизу */}
           <Animated.View style={[{ overflow: 'hidden' }, titleKb]}>

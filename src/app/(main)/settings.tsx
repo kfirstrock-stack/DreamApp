@@ -111,7 +111,7 @@ export default function SettingsScreen() {
           </Stagger>
         </View>
         <View style={{ flex: 1, minHeight: 32 }} />
-        <Text style={styles.version}>DreamApp {version} (MVP)</Text>
+        <Text style={styles.version}>Glimika {version} (MVP)</Text>
       </ScrollView>
 
       {confirm && (

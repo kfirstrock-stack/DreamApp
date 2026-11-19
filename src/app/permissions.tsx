@@ -42,7 +42,7 @@ export default function Permissions() {
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 53, paddingHorizontal: 32 }}>
         <Text style={styles.title}>Пара разрешений</Text>
-        <Text style={styles.body}>Без них DreamApp работает, но не сможет показать фото рядом и прочитать место из снимка.</Text>
+        <Text style={styles.body}>Без них Glimika работает, но не сможет показать фото рядом и прочитать место из снимка.</Text>
         <Card icon="pin" title="Геопозиция" text="Покажем фото рядом с вами и отметим, где сделан снимок" perm={geo} onAsk={askGeo} style={{ marginTop: 27 }} />
         <Card icon="gallery" title="Фото" text="Возьмём из снимков время и место съёмки — вам не придётся вводить их" perm={photo} onAsk={askPhoto} style={{ marginTop: 18 }} />
         <Text style={styles.note}>Камеру спросим, когда вы впервые сделаете снимок.</Text>

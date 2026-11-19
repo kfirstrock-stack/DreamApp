@@ -311,7 +311,7 @@ function A1({ progress, width }: { progress: P; width: number }) {
       <TextBlock progress={progress} i={0} width={width} bottom={insets.bottom + 94}>
         <Text style={styles.step}>01 / 03</Text>
         <Text style={[styles.title, { color: D.paper }]}>Каждое место помнит всех, кто там был</Text>
-        <Text style={[styles.body, { color: 'rgba(244,239,230,0.62)' }]}>DreamApp — живая история мест в фотографиях людей, которые там были.</Text>
+        <Text style={[styles.body, { color: 'rgba(244,239,230,0.62)' }]}>Glimika — живая история мест в фотографиях людей, которые там были.</Text>
       </TextBlock>
     </View>
   );

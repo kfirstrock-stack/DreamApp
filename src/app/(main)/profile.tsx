@@ -93,7 +93,7 @@ export default function ProfileScreen() {
                 {nickLine(profile)}
               </Text>
             ) : null}
-            <Text style={styles.since}>{since ? `В DREAMAPP С ${monthYearUpper(since)}` : ' '}</Text>
+            <Text style={styles.since}>{since ? `В GLIMIKA С ${monthYearUpper(since)}` : ' '}</Text>
           </View>
         </Pressable>
         </Stagger>

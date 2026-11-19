@@ -12,7 +12,7 @@ export async function pickAvatarImage(src: 'camera' | 'gallery'): Promise<{ uri:
     // доступ к камере спрашиваем только сейчас — при первой съёмке (как обещает A7)
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Нет доступа к камере', 'Разрешите DreamApp пользоваться камерой в настройках — или выберите фото из галереи.', [
+      Alert.alert('Нет доступа к камере', 'Разрешите Glimika пользоваться камерой в настройках — или выберите фото из галереи.', [
         { text: 'Отмена', style: 'cancel' },
         { text: 'Открыть настройки', onPress: () => Linking.openSettings() },
       ]);

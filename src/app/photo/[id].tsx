@@ -415,7 +415,7 @@ export default function PhotoScreen() {
                   label="Поделиться"
                   onPress={() => {
                     setMenu(null);
-                    Share.share({ message: `Момент в DreamApp: ${cur.place_name ?? ''}, ${stamp(taken)}` });
+                    Share.share({ message: `Момент в Glimika: ${cur.place_name ?? ''}, ${stamp(taken)}` });
                   }}
                 />
                 {mine && (
