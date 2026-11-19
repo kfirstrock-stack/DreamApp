@@ -8,11 +8,15 @@
     "scheme": "dreamapp",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": {
+        "light": "./assets/images/icon.png",
+        "dark": "./assets/images/icon-dark.png",
+        "tinted": "./assets/images/icon-tinted.png"
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0F0E0C",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -31,9 +35,14 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#1FAAAA",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#0F0E0C",
+          "image": "./assets/images/splash.png",
+          "resizeMode": "cover",
+          "enableFullScreenImage_legacy": true,
+          "dark": {
+            "backgroundColor": "#0F0E0C",
+            "image": "./assets/images/splash.png"
+          }
         }
       ],
       "expo-image",
