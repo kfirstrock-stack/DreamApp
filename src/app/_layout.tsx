@@ -40,6 +40,7 @@ export default function RootLayout() {
           <Stack.Screen name="(main)" />
           <Stack.Screen name="photo/[id]" options={{ animation: 'fade', contentStyle: { backgroundColor: D.night }, orientation: 'all' }} />
           <Stack.Screen name="add" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="batch" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="new" options={{ presentation: 'transparentModal', animation: 'none', contentStyle: { backgroundColor: 'transparent' } }} />
           <Stack.Screen
             name="sign-in"

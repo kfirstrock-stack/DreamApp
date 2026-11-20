@@ -1,4 +1,5 @@
 import { decode } from 'base64-arraybuffer';
+import { Image } from 'expo-image';
 import { DEMO_IMAGES } from './demoImages';
 import { SUPABASE_KEY, SUPABASE_URL } from './config';
 import { supabase } from './supabase';
@@ -9,6 +10,64 @@ import type { Bounds, Photo, TimeWindow } from './types';
 const cache = new Map<string, Photo>();
 export const cachePhotos = (list: Photo[]) => list.forEach((p) => cache.set(p.id, p));
 export const cachedPhoto = (id: string) => cache.get(id);
+
+// ── Только что опубликованные снимки (QA 17.11: «фото на карте с задержкой») ──
+// Сразу после insert снимок кладём сюда: карта рисует его, не дожидаясь запроса к серверу,
+// а картинку берёт из локального файла на телефоне. Когда снимок пришёл с сервера — убираем.
+const localPreview = new Map<string, string>(); // storage_path → локальный uri
+let fresh: Photo[] = [];
+let freshAdded = 0; // растёт на каждый новый снимок: карта сбрасывает кэш и перезапрашивает
+const freshListeners = new Set<() => void>();
+const emitFresh = () => freshListeners.forEach((l) => l());
+export type FreshAuthor = { username: string | null; name: string | null; avatar: string | null };
+export const onFreshPhotos = (l: () => void) => {
+  freshListeners.add(l);
+  return () => {
+    freshListeners.delete(l);
+  };
+};
+export const getFreshPhotos = () => fresh;
+export const getFreshAdded = () => freshAdded;
+function addFreshPhoto(p: Photo, localUri?: string | null) {
+  if (localUri) localPreview.set(p.storage_path, localUri);
+  cache.set(p.id, p);
+  fresh = [...fresh.filter((f) => f.id !== p.id), p];
+  freshAdded++;
+  emitFresh();
+}
+/** Снимки, которые уже пришли с сервера, больше не держим отдельно */
+export function settleFreshPhotos(list: Photo[]) {
+  if (!fresh.length) return;
+  const ids = new Set(list.map((p) => p.id));
+  const next = fresh.filter((f) => !ids.has(f.id));
+  if (next.length === fresh.length) return;
+  // файл уже на сервере — переходим на него, а не на временный JPEG (его может стереть система)
+  for (const f of fresh) if (ids.has(f.id)) swapToRemote(f.storage_path);
+  fresh = next;
+  emitFresh();
+}
+/** Без мигания (QA recheck 2): сначала докачиваем серверную картинку в кэш expo-image, потом снимаем локальную.
+ *  Экраны перейдут на серверный адрес при следующей отрисовке — картинка уже в кэше. */
+function swapToRemote(path: string) {
+  const local = localPreview.get(path);
+  if (!local) return;
+  localPreview.delete(path);
+  const remote = photoSource(path);
+  localPreview.set(path, local);
+  if (typeof remote === 'number') return void localPreview.delete(path);
+  Image.prefetch(remote.uri, { cachePolicy: 'memory-disk', headers: remote.headers })
+    .catch(() => false)
+    .then(() => {
+      if (localPreview.get(path) === local) localPreview.delete(path);
+    });
+}
+function forgetFresh(id: string) {
+  const f = fresh.find((x) => x.id === id);
+  if (f) localPreview.delete(f.storage_path);
+  if (!f) return;
+  fresh = fresh.filter((f) => f.id !== id);
+  emitFresh();
+}
 
 // ── Хранилища (21.10) ──
 // Снимки «Только мне» лежат в закрытом хранилище photos-private: в storage_path у них приставка priv/,
@@ -31,6 +90,8 @@ supabase.auth.onAuthStateChange((_e, session) => (accessToken = session?.access_
 
 /** Источник картинки для expo-image: демо-снимки лежат в самом приложении (demo://demo-01) */
 export function photoSource(path: string): number | { uri: string; headers?: Record<string, string> } {
+  const local = localPreview.get(path);
+  if (local) return { uri: local };
   if (path.startsWith('demo://')) {
     const local = DEMO_IMAGES[path.slice('demo://'.length)];
     if (local) return local;
@@ -152,7 +213,13 @@ export function newPublishKey(userId: string, mimeType: string, priv = false): P
 /** Обрыв связи: запрос мог дойти до сервера, просто ответ не вернулся */
 const netError = (e: any) => /network|fetch|timed? ?out|offline|connection|abort/i.test(`${e?.name ?? ''} ${e?.message ?? ''}`);
 
-export async function uploadPhoto(userId: string, p: NewPhoto, key?: PublishKey): Promise<string> {
+/** localUri и author — для мгновенного показа на карте (снимок без запроса к серверу) */
+export async function uploadPhoto(
+  userId: string,
+  p: NewPhoto,
+  key?: PublishKey,
+  show?: { localUri?: string | null; author?: FreshAuthor | null },
+): Promise<string> {
   const k = key ?? newPublishKey(userId, p.mimeType, !!p.private);
   // «Только мне» переключили до первой удачной загрузки — файл пойдёт в нужное хранилище
   if (!k.uploaded && isPrivPath(k.path) !== !!p.private) k.path = withPriv(k.path, !!p.private);
@@ -178,8 +245,32 @@ export async function uploadPhoto(userId: string, p: NewPhoto, key?: PublishKey)
     caption: p.caption,
     private: isPrivPath(k.path),
   });
+  const done = () => {
+    addFreshPhoto(
+      {
+        id: k.id,
+        user_id: userId,
+        storage_path: k.path,
+        width: p.width,
+        height: p.height,
+        taken_at: p.takenAt.toISOString(),
+        lat: p.lat,
+        lng: p.lng,
+        place_name: p.placeName,
+        caption: p.caption,
+        like_count: 0,
+        liked_by_me: false,
+        private: isPrivPath(k.path),
+        author_username: show?.author?.username ?? null,
+        author_name: show?.author?.name ?? null,
+        author_avatar: show?.author?.avatar ?? null,
+      },
+      show?.localUri,
+    );
+    return k.id;
+  };
   if (error) {
-    if (error.code === '23505') return k.id; // момент уже записан прошлой попыткой
+    if (error.code === '23505') return done(); // момент уже записан прошлой попыткой
     // сервер отказал — файл больше не нужен; обрыв связи — оставляем: запись могла пройти
     if (!netError(error)) {
       const [bucket, name] = bucketOf(k.path);
@@ -188,7 +279,7 @@ export async function uploadPhoto(userId: string, p: NewPhoto, key?: PublishKey)
     }
     throw error;
   }
-  return k.id;
+  return done();
 }
 
 export async function deletePhoto(p: Photo) {
@@ -199,6 +290,8 @@ export async function deletePhoto(p: Photo) {
     await supabase.storage.from(bucket).remove([name]);
   }
   cache.delete(p.id);
+  forgetFresh(p.id);
+  localPreview.delete(p.storage_path);
 }
 
 // ---------- v2: лайки, скрытые авторы, моменты ----------
@@ -282,6 +375,8 @@ export async function setPhotoPrivate(p: Pick<Photo, 'id' | 'storage_path'>, on:
     c.private = on;
     c.storage_path = path;
   }
+  localPreview.delete(p.storage_path);
+  forgetFresh(p.id); // карта возьмёт снимок с сервера, уже с новым путём
   return path;
 }
 

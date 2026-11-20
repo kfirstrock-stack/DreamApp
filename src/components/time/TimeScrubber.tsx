@@ -34,6 +34,7 @@ type Props = {
   now: SharedValue<number>; // текущее время, минуты от начала дня (дробное) — для проявления фото
   index: SharedValue<number>; // текущий интервал — для цифр времени
   onIndexChange: (i: number) => void;
+  onUserTouch?: () => void; // палец на шкале (не команда jumpTo) — карта не перебивает выбор автоперелётом
   jumpTo?: { i: number; key: number } | null; // команда «переехать к интервалу»
   sidePadding?: number; // отступ карточки от краёв экрана
   header?: ReactNode;
@@ -57,7 +58,7 @@ const Bar = memo(function Bar({ i, h, w, x, off }: { i: number; h: number; w: nu
 // Шкала-гистограмма суток: едет за пальцем, после броска докатывается по инерции,
 // тап по гистограмме — переход к моменту, щелчок вибрацией на каждом шаге.
 export const TimeScrubber = memo(function TimeScrubber({
-  counts, offset, curLen, shift, initialIndex, onSettle, now, index, onIndexChange, jumpTo, sidePadding = 12, header, footer, ticks, compact = false,
+  counts, offset, curLen, shift, initialIndex, onSettle, onUserTouch, now, index, onIndexChange, jumpTo, sidePadding = 12, header, footer, ticks, compact = false,
 }: Props) {
   const maxH = compact ? 20 : MAX_H;
   const barW = compact ? 4 : BAR_W;
@@ -82,6 +83,9 @@ export const TimeScrubber = memo(function TimeScrubber({
   const settleRef = useRef(onSettle);
   settleRef.current = onSettle;
   const settled = () => settleRef.current?.();
+  const userRef = useRef(onUserTouch);
+  userRef.current = onUserTouch;
+  const touched = () => userRef.current?.();
   const tick = (i: number, quiet: boolean) => {
     if (!quiet) Haptics.selectionAsync().catch(() => {});
     onIndexChange(i);
@@ -146,6 +150,7 @@ export const TimeScrubber = memo(function TimeScrubber({
     const pan = Gesture.Pan()
       .minDistance(1)
       .onBegin(() => {
+        scheduleOnRN(touched);
         auto.value = false;
         caught.value = moving.value;
         cancelAnimation(x);
@@ -174,6 +179,7 @@ export const TimeScrubber = memo(function TimeScrubber({
       .maxDuration(250)
       .maxDistance(6)
       .onEnd((e) => {
+        scheduleOnRN(touched);
         if (caught.value || e.y < barsTop.value) return;
         const t = Math.min(maxX, Math.max(minX, Math.round((x.value + (e.x - INSET - center)) / ITEM) * ITEM));
         moving.value = true;

@@ -1,4 +1,5 @@
-// Лента · карточки (B5 / D3 / D1, утверждено 13.10): снимок во всю ширину, под ним автор, время, лайки и подпись
+// Лента · карточки (B5 / D3 / D1, утверждено 13.10): снимок во всю ширину, под ним автор, время, лайки и подпись.
+// В профиле (showAuthor = false) автор всегда один — вместо него место снимка: тап → карта у этого места и времени (17.11)
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -9,6 +10,7 @@ import { Icon } from '@/components/Icon';
 import { useAuth } from '@/lib/auth';
 import { D, F } from '@/lib/design';
 import { ago } from '@/lib/feed';
+import { hasPlace, useShowPhotoOnMap } from '@/lib/focus';
 import { photoSource, setLike } from '@/lib/photos';
 import type { Photo } from '@/lib/types';
 
@@ -62,11 +64,14 @@ function Card({ p, onOpen, showAuthor, inset }: { p: Photo; onOpen: (p: Photo) =
         <Image source={photoSource(p.storage_path)} style={[styles.photo, { height: h }]} contentFit="cover" transition={200} recyclingKey={p.id} />
       </Pressable>
       <View style={styles.row}>
+        {!showAuthor ? (
+          <PlaceTag p={p} t={t} />
+        ) : (
         <Pressable
-          onPress={() => (showAuthor ? router.push(mine ? '/profile' : { pathname: '/user/[id]', params: { id: p.user_id } }) : onOpen(p))}
+          onPress={() => router.push(mine ? '/profile' : { pathname: '/user/[id]', params: { id: p.user_id } })}
           style={styles.author}
           hitSlop={{ top: 6, bottom: 6 }} // зона нажатия ≥ 44 pt
-          accessibilityLabel={showAuthor ? 'Профиль автора' : 'Открыть снимок'}
+          accessibilityLabel="Профиль автора"
         >
           {p.author_avatar ? <Image source={{ uri: p.author_avatar }} style={styles.ava} /> : <View style={[styles.ava, { backgroundColor: D.sun }]} />}
           <View style={{ flex: 1, gap: 1 }}>
@@ -78,6 +83,7 @@ function Card({ p, onOpen, showAuthor, inset }: { p: Photo; onOpen: (p: Photo) =
             </Text>
           </View>
         </Pressable>
+        )}
         <Pressable onPress={like} hitSlop={10} style={styles.like} accessibilityLabel={liked ? 'Убрать лайк' : 'Лайк'}>
           <Icon name={liked ? 'heartFill' : 'heart'} size={20} color={liked ? D.sun : D.ink} />
           <Text style={styles.count}>{count}</Text>
@@ -88,6 +94,36 @@ function Card({ p, onOpen, showAuthor, inset }: { p: Photo; onOpen: (p: Photo) =
   );
 }
 
+/** Место снимка вместо автора (профиль): «📍 Исаакиевская площадь» → на карту; без координат — «Без места», не нажимается */
+function PlaceTag({ p, t }: { p: Photo; t: Date }) {
+  const showOnMap = useShowPhotoOnMap();
+  const can = hasPlace(p);
+  const name = p.place_name || (can ? 'Место на карте' : 'Без места');
+  const time = `${pad(t.getHours())}:${pad(t.getMinutes())} · ${ago(t)}`;
+  return (
+    <Pressable
+      onPress={can ? () => showOnMap(p) : undefined}
+      disabled={!can}
+      style={({ pressed }) => [styles.author, styles.place, pressed && { opacity: 0.6 }]}
+      accessibilityRole={can ? 'link' : 'text'}
+      accessibilityLabel={can ? `${name}, ${time}. Показать на карте` : `Без места, ${time}`}
+    >
+      <View style={[styles.pinBox, !can && { backgroundColor: D.paper2 }]}>
+        <Icon name="pin" size={16} color={can ? D.sun : D.ink60} />
+      </View>
+      <View style={{ flex: 1, gap: 1 }}>
+        <Text style={[styles.name, !can && { color: D.ink60 }]} numberOfLines={1}>
+          {name}
+        </Text>
+        <Text style={styles.sub} numberOfLines={1}>
+          {time}
+        </Text>
+      </View>
+      {can && <Icon name="chevR" size={16} color={D.ink60} />}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   list: { gap: 28 },
   card: { gap: 12 },
@@ -95,6 +131,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   author: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   ava: { width: 32, height: 32, borderRadius: 16 },
+  place: { minHeight: 44 }, // зона нажатия ≥ 44 pt
+  pinBox: { width: 32, height: 32, borderRadius: 16, backgroundColor: D.sunSoft, alignItems: 'center', justifyContent: 'center' },
   name: { fontFamily: F.sansSemi, fontSize: 14, color: D.ink },
   sub: { fontFamily: F.sans, fontSize: 12, color: D.ink60 },
   like: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 8 },

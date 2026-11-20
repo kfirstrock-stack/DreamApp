@@ -93,7 +93,14 @@ export async function fetchAuthorPhotos(uid: string): Promise<Photo[]> {
     .order('taken_at', { ascending: false })
     .limit(300);
   if (error) throw error;
-  const list = (data ?? []).map((r: any) => ({ ...r, author_username: null, author_name: null, author_avatar: null })) as Photo[];
+  // автор у всех снимков один — подставляем его имя, иначе в ленте профиля везде «Путешественник»
+  const author = await fetchProfile(uid).catch(() => null);
+  const list = (data ?? []).map((r: any) => ({
+    ...r,
+    author_username: author?.username ?? null,
+    author_name: author?.display_name ?? null,
+    author_avatar: author?.avatar_url ?? null,
+  })) as Photo[];
   cachePhotos(list);
   return list;
 }

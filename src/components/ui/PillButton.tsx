@@ -18,7 +18,7 @@ type Props = {
 export function PillButton({ title, onPress, kind = 'primary', icon, loading, disabled, style, small }: Props) {
   const s = useSharedValue(1);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
-  const bg = kind === 'primary' ? D.sun : kind === 'dark' ? D.ink : kind === 'secondary' ? 'transparent' : D.paper2;
+  const bg = kind === 'primary' ? D.sunBtn : kind === 'dark' ? D.ink : kind === 'secondary' ? 'transparent' : D.paper2;
   const fg = kind === 'primary' || kind === 'dark' ? D.white : D.ink;
   return (
     <Pressable

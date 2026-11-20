@@ -1,26 +1,23 @@
 // C3 · Подтверждение → C4 · Место на карте / C5 · Время вручную → публикация → C6 · Момент на карте
 import { Image } from 'expo-image';
-import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '@/components/ui/Text';
-import MapView, { type Region } from 'react-native-maps';
-import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VisibilitySwitch } from '@/components/ui/VisibilitySwitch';
 import { Icon } from '@/components/Icon';
-import { TimeWheel } from '@/components/time/TimeWheel';
 import { useAuth } from '@/lib/auth';
-import { D, F, SHEET_SPRING } from '@/lib/design';
+import { D, F } from '@/lib/design';
 import { clearSavedDraft, getDraft, saveDraft, setDraft, takeDraftExtras, type Draft } from '@/lib/draft';
 import { requestMapFocus } from '@/lib/focus';
 import { boundsAround, fetchPhotosV2, newPublishKey, uploadPhoto, type PublishKey } from '@/lib/photos';
 import { reverseAddress } from '@/lib/places';
 import type { Photo } from '@/lib/types';
-import { SheetGrab } from '@/components/ui/SheetGrab';
-import { PlaceSearch } from '@/components/place/PlaceSearch';
+import { PlacePicker } from '@/components/place/PlacePicker';
+import { TimePicker } from '@/components/time/TimePicker';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const WD = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
@@ -37,6 +34,7 @@ const plural = (n: number, one: string, few: string, many: string) => {
 };
 const SLOT = 15;
 
+type Done = { at: Date; lat: number; lng: number; people: Photo[]; loadingPeople: boolean };
 type View3 = 'confirm' | 'place' | 'time' | 'done' | 'error';
 // E2 (утверждено 12.10): сеть — со счётчиком попыток, сервер — без; после 3-й попытки — «Сейчас не получается»
 type PubError = { kind: 'network' | 'server'; attempt: number; detail?: string };
@@ -48,7 +46,7 @@ const isNetwork = (e: any) => {
 };
 
 export default function PublishScreen() {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const [draft, setD] = useState<Draft | null>(() => getDraft());
   // «Продолжить черновик» (C2): место, адрес и подпись — как были введены
   const [saved] = useState(() => takeDraftExtras());
@@ -59,7 +57,7 @@ export default function PublishScreen() {
   const [pubError, setPubError] = useState<PubError | null>(null);
   const pubKey = useRef<PublishKey | null>(null); // один момент на все «Повторить»
   const [uploading, setUploading] = useState(false);
-  const [done, setDone] = useState<{ at: Date; lat: number; lng: number; people: Photo[] } | null>(null);
+  const [done, setDone] = useState<Done | null>(null);
   // Нет места → сразу C4, нет времени → C5 (заметка C3)
   const [view, setView] = useState<View3>(() => (!draft ? 'confirm' : draft.lat == null ? 'place' : draft.takenAt == null ? 'time' : 'confirm'));
   const found = useRef(draft ? draft.lat != null && draft.takenAt != null : false); // «Место и время найдены» — только если оба из снимка
@@ -74,7 +72,7 @@ export default function PublishScreen() {
       if (off) return;
       setPlace(a.place);
       setAddress(a.address);
-    });
+    }).catch(() => {});
     return () => {
       off = true;
     };
@@ -106,16 +104,25 @@ export default function PublishScreen() {
         placeName: place,
         caption: caption.trim() || null,
         private: priv,
-      }, pubKey.current);
-      // C6: сразу считаем, кто ещё снимал здесь ±15 минут
-      const t = draft.takenAt.getTime();
-      const near = await fetchPhotosV2(boundsAround(draft.lat, draft.lng, 100), new Date(t - 15 * 60000), new Date(t + 15 * 60000), 300).catch(() => []);
-      const people = Array.from(new Map(near.filter((p) => p.user_id !== session.user.id).map((p) => [p.user_id, p])).values());
+      }, pubKey.current, {
+        // карта покажет снимок сразу, из локального файла (QA 17.11)
+        localUri: draft.uri,
+        author: profile ? { username: profile.username, name: profile.display_name, avatar: profile.avatar_url } : null,
+      });
       clearSavedDraft(); // опубликовано — черновик больше не нужен
       pubKey.current = null;
       setPubError(null);
-      setDone({ at: draft.takenAt, lat: draft.lat, lng: draft.lng, people });
+      const at = draft.takenAt, lat = draft.lat, lng = draft.lng, uid = session.user.id;
+      setDone({ at, lat, lng, people: [], loadingPeople: true });
       setView('done');
+      // C6: кто ещё снимал здесь ±15 минут — догружаем фоном, экран успеха не ждёт (QA 17.11)
+      const t = at.getTime();
+      fetchPhotosV2(boundsAround(lat, lng, 100), new Date(t - 15 * 60000), new Date(t + 15 * 60000), 300)
+        .catch(() => [] as Photo[])
+        .then((near) => {
+          const people = Array.from(new Map(near.filter((p) => p.user_id !== uid).map((p) => [p.user_id, p])).values());
+          setDone((d) => (d && d.at === at ? { ...d, people, loadingPeople: false } : d));
+        });
     } catch (e: any) {
       const kind = isNetwork(e) ? 'network' : 'server';
       setPubError((prev) => ({ kind, attempt: Math.min(MAX_TRIES, (prev?.kind === kind ? prev.attempt : 0) + 1), detail: `${e?.name ?? ''}: ${e?.message ?? String(e)}${e?.code ? ` [${e.code}]` : ''}` }));
@@ -145,7 +152,8 @@ export default function PublishScreen() {
       <PlacePicker
         draft={draft}
         noGeo={draft.lat == null}
-        onCancel={() => (draft.lat == null ? router.back() : setView('confirm'))}
+        // без места в снимке Confirm показать нечего — к выбору фото (C2), а не на карту
+        onCancel={() => (draft.lat == null ? router.replace('/new') : setView('confirm'))}
         onPick={(lat, lng, a) => {
           update({ lat, lng, locationSource: 'manual' });
           // 12.10: раньше при быстром нажатии оставался адрес прежней точки («Хоккейная, 39» у Исаакиевского)
@@ -163,6 +171,8 @@ export default function PublishScreen() {
           update({ takenAt: at, timeSource: 'manual' });
           setView('confirm');
         }}
+        // без времени в снимке Confirm показать нечего — к выбору фото (C2): /new снят с истории, back увёл бы на карту
+        onCancel={() => (draft.takenAt == null ? router.replace('/new') : setView('confirm'))}
       />
     );
   return (
@@ -200,7 +210,7 @@ function Confirm(p: {
 }) {
   const insets = useSafeAreaInsets();
   const { draft } = p;
-  const t = draft.takenAt!;
+  const t = draft.takenAt;
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: D.paper }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar style="dark" />
@@ -226,7 +236,7 @@ function Confirm(p: {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.foundTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                {longDate(t)}, {hhmm(t)}
+                {t ? `${longDate(t)}, ${hhmm(t)}` : 'Укажите время'}
               </Text>
               <Text style={styles.foundSub}>{draft.timeSource === 'manual' ? 'указано вручную · можно поправить' : 'из данных снимка · можно поправить'}</Text>
             </View>
@@ -273,165 +283,8 @@ function Confirm(p: {
   );
 }
 
-/** C4 · Место на карте: карта двигается под булавкой, адрес — обратным геокодированием */
-function PlacePicker({ draft, noGeo, onCancel, onPick }: { draft: Draft; noGeo: boolean; onCancel: () => void; onPick: (lat: number, lng: number, a: { address: string | null; place: string | null }) => void }) {
-  const insets = useSafeAreaInsets();
-  const map = useRef<MapView>(null);
-  const start: Region = { latitude: draft.lat ?? 59.9341, longitude: draft.lng ?? 30.3061, latitudeDelta: 0.006, longitudeDelta: 0.006 };
-  const [at, setAt] = useState({ lat: start.latitude, lng: start.longitude });
-  // адрес помнит, для какой точки он посчитан: пока карту двигают, старый адрес не выдаём за новый
-  const [addr, setAddr] = useState<{ address: string | null; place: string | null; lat?: number; lng?: number }>({ address: null, place: null });
-  const fresh = addr.lat === at.lat && addr.lng === at.lng;
-  const [searching, setSearching] = useState(false); // C4 · поиск по названию (12.10)
-  useEffect(() => {
-    let off = false;
-    const t = setTimeout(() => reverseAddress(at.lat, at.lng).then((a) => !off && setAddr({ ...a, lat: at.lat, lng: at.lng })), 250);
-    return () => {
-      off = true;
-      clearTimeout(t);
-    };
-  }, [at.lat, at.lng]);
-  // без геоданных начинаем с того места, где сейчас телефон
-  useEffect(() => {
-    if (!noGeo) return;
-    Location.getForegroundPermissionsAsync()
-      .then((p) => (p.granted ? Location.getLastKnownPositionAsync() : null))
-      .then((pos) => pos && map.current?.animateToRegion({ ...start, latitude: pos.coords.latitude, longitude: pos.coords.longitude }, 0))
-      .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const locate = async () => {
-    const perm = await Location.requestForegroundPermissionsAsync();
-    if (!perm.granted) return;
-    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    map.current?.animateToRegion({ ...start, latitude: pos.coords.latitude, longitude: pos.coords.longitude }, 500);
-  };
-  return (
-    <View style={{ flex: 1, backgroundColor: D.mapBase }}>
-      <StatusBar style="dark" />
-      <MapView
-        ref={map}
-        style={StyleSheet.absoluteFill}
-        initialRegion={start}
-        mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
-        showsPointsOfInterests={false}
-        showsUserLocation
-        rotateEnabled={false}
-        pitchEnabled={false}
-        onRegionChangeComplete={(r) => setAt({ lat: r.latitude, lng: r.longitude })}
-      />
-      {/* булавка над центром карты: острие — в центре */}
-      <View pointerEvents="none" style={styles.pinCenter}>
-        <View style={styles.pin}>
-          <Icon name="pin" size={28} color={D.white} />
-        </View>
-        <View style={styles.pinStick} />
-        <View style={styles.pinShadow} />
-      </View>
-      <View style={[styles.c4Top, { top: insets.top + 9 }]}>
-        <Pressable onPress={onCancel} style={styles.round} accessibilityLabel="Назад">
-          <Icon name="back" size={20} color={D.ink} />
-        </Pressable>
-        <View style={styles.hint}>
-          <Text style={styles.hintTitle}>Где сделан снимок?</Text>
-          <Text style={styles.hintText}>Найдите по названию или сдвиньте карту</Text>
-          <Pressable onPress={() => setSearching(true)} style={({ pressed }) => [styles.c4Search, pressed && { opacity: 0.7 }]} accessibilityLabel="Найти место или адрес">
-            <Icon name="search" size={18} color={D.ink60} />
-            <Text style={styles.c4SearchText}>Найти место или адрес</Text>
-          </Pressable>
-        </View>
-      </View>
-      <View style={[styles.c4Bottom, { bottom: Math.max(insets.bottom, 12) + 28 }]}>
-        <Pressable onPress={locate} style={[styles.round, { alignSelf: 'flex-end', marginRight: 4, marginBottom: 20 }]} accessibilityLabel="Где я">
-          <Icon name="locate" size={20} color={D.ink} />
-        </Pressable>
-        <View style={styles.addressCard}>
-          <Text style={styles.addrLabel}>АДРЕС</Text>
-          <Text style={styles.addrTitle} numberOfLines={1}>
-            {fresh ? (addr.address ?? '—') : '…'}
-          </Text>
-          <Text style={styles.addrCoords}>
-            {coords(at.lat, at.lng)} · {coordsLng(at.lng)}
-          </Text>
-          <Pressable onPress={() => onPick(at.lat, at.lng, fresh ? addr : { address: null, place: null })} style={({ pressed }) => [styles.button, { marginTop: 24 }, pressed && { opacity: 0.88 }]}>
-            <Text style={styles.buttonText}>Снимок сделан здесь</Text>
-          </Pressable>
-          {/* 13.10: 32 pt от кнопки до «Отмены» и зона нажатия 46 pt, не заходящая на кнопку (как на A4) */}
-          <Pressable onPress={onCancel} hitSlop={{ left: 16, right: 16 }} style={{ alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13 }} accessibilityRole="button">
-            <Text style={styles.cancel}>Отмена</Text>
-          </Pressable>
-        </View>
-      </View>
-      {searching && (
-        <PlaceSearch
-          near={at}
-          onCancel={() => setSearching(false)}
-          onPick={(p) => {
-            setSearching(false);
-            map.current?.animateToRegion({ ...start, latitude: p.lat, longitude: p.lng }, 500);
-          }}
-        />
-      )}
-    </View>
-  );
-}
-
-/** C5 · Время вручную: дата стрелками, время — колесом по сетке шкалы (15 минут) */
-function TimePicker({ draft, onDone }: { draft: Draft; onDone: (at: Date) => void }) {
-  const insets = useSafeAreaInsets();
-  const base = draft.takenAt ?? new Date();
-  const [day, setDay] = useState(() => new Date(base.getFullYear(), base.getMonth(), base.getDate()));
-  const [slot, setSlot] = useState(() => Math.floor((base.getHours() * 60 + base.getMinutes()) / SLOT));
-  const today = new Date();
-  const isToday = day.toDateString() === today.toDateString();
-  const shift = (n: number) => setDay((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n));
-  const done = () => {
-    const at = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, slot * SLOT);
-    onDone(at > today ? new Date(today.getTime() - 60000) : at);
-  };
-  return (
-    <View style={{ flex: 1, backgroundColor: D.night }}>
-      <StatusBar style="light" />
-      <Image source={{ uri: draft.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,14,12,0.5)' }]} />
-      <View style={{ flex: 1 }} />
-      <Animated.View
-        entering={SlideInDown.springify().damping(SHEET_SPRING.damping).stiffness(SHEET_SPRING.stiffness).mass(SHEET_SPRING.mass)}
-        style={[styles.timeSheet, { paddingBottom: Math.max(insets.bottom, 16) + 24 }]}
-      >
-        <View style={styles.grip}>
-          <SheetGrab />
-        </View>
-        <Text style={styles.c5Title}>Когда сделан снимок?</Text>
-        {draft.takenAt == null && (
-          <View style={styles.noTime}>
-            <Icon name="clock" size={16} color={D.sun} />
-            <Text style={styles.noTimeText}>В снимке нет времени съёмки</Text>
-          </View>
-        )}
-        <View style={styles.dateRow}>
-          <Pressable hitSlop={12} onPress={() => shift(-1)} accessibilityLabel="Предыдущий день">
-            <Icon name="chevL" size={20} color={D.ink} />
-          </Pressable>
-          <Text style={styles.dateText}>{longDate(day)}</Text>
-          <Pressable hitSlop={12} disabled={isToday} onPress={() => shift(1)} accessibilityLabel="Следующий день">
-            <Icon name="chevR" size={20} color={isToday ? D.line : D.ink} />
-          </Pressable>
-        </View>
-        <Text style={[styles.label, { marginTop: 24 }]}>ВРЕМЯ</Text>
-        <View>
-          <TimeWheel count={96} initial={slot} slotMin={SLOT} onChange={setSlot} item={43} size={30} band={54} />
-        </View>
-        <Text style={styles.c5Note}>Если не помните точно — укажите примерно. Совпадения ищем в окне ±15 минут.</Text>
-        <Pressable onPress={done} style={({ pressed }) => [styles.button, { marginTop: 32 }, pressed && { opacity: 0.88 }]}>
-          <Text style={styles.buttonText}>Готово</Text>
-        </Pressable>
-      </Animated.View>
-    </View>
-  );
-}
-
 /** C6 · Момент на карте (и «рядом никого» — утверждено 09.10) */
-function Published({ draft, place, address, done }: { draft: Draft; place: string | null; address: string | null; done: { at: Date; lat: number; lng: number; people: Photo[] } }) {
+function Published({ draft, place, address, done }: { draft: Draft; place: string | null; address: string | null; done: Done }) {
   const insets = useSafeAreaInsets();
   const n = done.people.length;
   // как в C3: адрес с номером дома («ИСААКИЕВСКАЯ ПЛ., 4»)
@@ -484,9 +337,9 @@ function Published({ draft, place, address, done }: { draft: Draft; place: strin
         )}
         <View style={{ flex: 1, gap: 3 }}>
           <Text style={styles.whoTitle} numberOfLines={1}>
-            {n > 0 ? `Здесь ${n === 1 ? 'был' : 'были'} ещё ${n} ${plural(n, 'человек', 'человека', 'человек')}` : 'Пока вы здесь один'}
+            {n > 0 ? `Здесь ${n === 1 ? 'был' : 'были'} ещё ${n} ${plural(n, 'человек', 'человека', 'человек')}` : done.loadingPeople ? 'Ищем, кто был рядом…' : 'Пока вы здесь один'}
           </Text>
-          <Text style={styles.whoSub}>{n > 0 ? '±15 минут от вашего снимка' : '±15 минут больше никто не снимал'}</Text>
+          <Text style={styles.whoSub}>{n > 0 || done.loadingPeople ? '±15 минут от вашего снимка' : '±15 минут больше никто не снимал'}</Text>
         </View>
       </View>
       {/* оранжевая кнопка — только для просмотра чужих фото; если смотреть нечего, остаётся серая ссылка */}
@@ -553,7 +406,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
   },
-  button: { backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
+  button: { backgroundColor: D.sunBtn, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
   // E2
   e2Title: { fontFamily: F.serifItalic, fontSize: 31, lineHeight: 41, color: D.ink },
   e2Photo: { marginTop: 11, height: 250, borderRadius: 24, opacity: 0.5, backgroundColor: D.paper2 },
@@ -566,7 +419,6 @@ const styles = StyleSheet.create({
   e2SaveText: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink60 },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
   label: { fontFamily: F.mono, fontSize: 11, lineHeight: 15, letterSpacing: 0.88, color: D.ink60 },
-  grip: { alignSelf: 'center', height: 26, paddingTop: 9 },
   // C3
   c3Title: { marginTop: 12, fontFamily: F.serifItalic, fontSize: 31, lineHeight: 40, color: D.ink },
   preview: { marginTop: 12, height: 200, borderRadius: 24, overflow: 'hidden', backgroundColor: D.paper2 },
@@ -614,92 +466,6 @@ const styles = StyleSheet.create({
     color: D.ink,
   },
   footnote: { marginTop: 14, textAlign: 'center', fontFamily: F.sans, fontSize: 12, lineHeight: 17, color: D.ink60 },
-  // C4
-  pinCenter: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', paddingBottom: 66 },
-  pin: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: D.sun,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#17120D',
-    shadowOpacity: 0.3,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 8 },
-  },
-  pinStick: { width: 3, height: 14, marginTop: -2, borderRadius: 1.5, backgroundColor: D.sun },
-  pinShadow: { width: 14, height: 14, marginTop: -2, borderRadius: 7, backgroundColor: 'rgba(23,18,13,0.2)' },
-  c4Top: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  hint: {
-    flex: 1,
-    marginTop: -4,
-    backgroundColor: D.white,
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 13,
-    shadowColor: '#17120D',
-    shadowOpacity: 0.12,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 6 },
-  },
-  hintTitle: { fontFamily: F.sansSemi, fontSize: 15, lineHeight: 19, color: D.ink },
-  hintText: { marginTop: 5, fontFamily: F.sans, fontSize: 13, lineHeight: 17, color: D.ink60 },
-  c4Search: { marginTop: 10, height: 42, borderRadius: 21, backgroundColor: D.paper, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14 },
-  c4SearchText: { fontFamily: F.sansMedium, fontSize: 15, color: D.ink60 },
-  c4Bottom: { position: 'absolute', left: 12, right: 12 },
-  addressCard: {
-    backgroundColor: D.white,
-    borderRadius: 28,
-    padding: 20,
-    paddingBottom: 21 - 13, // 13 — нижняя часть зоны нажатия «Отмены»
-    shadowColor: '#17120D',
-    shadowOpacity: 0.16,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
-  },
-  addrLabel: { fontFamily: F.mono, fontSize: 11, lineHeight: 15, letterSpacing: 0.66, color: D.ink60 },
-  addrTitle: { marginTop: 7, fontFamily: F.sansSemi, fontSize: 19, lineHeight: 24, color: D.ink },
-  addrCoords: { marginTop: 8, fontFamily: F.mono, fontSize: 12, lineHeight: 16, letterSpacing: 0.72, color: D.ink40 },
-  cancel: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink60 },
-  // C5
-  timeSheet: {
-    backgroundColor: D.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    shadowColor: '#17120D',
-    shadowOpacity: 0.14,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: -6 },
-  },
-  c5Title: { marginTop: 2, fontFamily: F.serif, fontSize: 28, lineHeight: 37, color: D.ink },
-  noTime: {
-    marginTop: 13,
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingLeft: 12,
-    paddingRight: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: D.sunSoft,
-  },
-  noTimeText: { fontFamily: F.sansMedium, fontSize: 13, lineHeight: 17, color: D.sun },
-  dateRow: {
-    marginTop: 21,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: D.paper,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  dateText: { fontFamily: F.sansSemi, fontSize: 16, color: D.ink },
-  c5Note: { marginTop: 16, fontFamily: F.sans, fontSize: 13, lineHeight: 19, color: D.ink60 },
   // C6
   c6: { flex: 1, backgroundColor: D.night, alignItems: 'center', paddingHorizontal: 24 },
   polaroidWrap: { width: 245, height: 293, alignItems: 'center', justifyContent: 'center' },
@@ -744,7 +510,7 @@ const styles = StyleSheet.create({
     paddingRight: 14,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: D.sun,
+    backgroundColor: D.sunBtn,
   },
   matchText: { fontFamily: F.sansSemi, fontSize: 13, lineHeight: 17, color: D.white },
   who: { alignSelf: 'stretch', height: 84, borderRadius: 22, backgroundColor: D.night3, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 18 },

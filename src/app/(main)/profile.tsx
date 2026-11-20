@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   miniImg: { width: '100%', height: '100%' },
   cardTitle: { position: 'absolute', left: 132, top: 20, right: 14, fontFamily: F.sansSemi, fontSize: 15, lineHeight: 20, color: D.paper },
   cardMeta: { position: 'absolute', left: 132, top: 62, right: 14, fontFamily: F.monoRegular, fontSize: 10, letterSpacing: 0.4, color: 'rgba(244,239,230,0.55)' },
-  cardBtn: { position: 'absolute', left: 132, top: 84, backgroundColor: D.sun, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
+  cardBtn: { position: 'absolute', left: 132, top: 84, backgroundColor: D.sunBtn, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
   cardBtnText: { fontFamily: F.sansSemi, fontSize: 13, color: D.white },
   empty: { marginTop: 9, marginHorizontal: 20, backgroundColor: D.white, borderRadius: 24, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 20, gap: 6 },
   emptyTitle: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink },

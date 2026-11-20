@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   ic: { width: 52, height: 52, borderRadius: 26, backgroundColor: D.sunSoft, alignItems: 'center', justifyContent: 'center' },
   dTitle: { marginTop: 16, fontFamily: F.serif, fontSize: 26, color: D.ink },
   dText: { marginTop: 8, fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: D.ink60 },
-  dButton: { marginTop: 18, backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
+  dButton: { marginTop: 18, backgroundColor: D.sunBtn, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
   dButtonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
   cancel: { alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13 },
   cancelText: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink60 },

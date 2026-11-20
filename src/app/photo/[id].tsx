@@ -31,6 +31,7 @@ import { PillButton } from '@/components/ui/PillButton';
 import { RoundButton } from '@/components/ui/RoundButton';
 import { SheetGrab } from '@/components/ui/SheetGrab';
 import { useAuth } from '@/lib/auth';
+import { hasPlace, useShowPhotoOnMap } from '@/lib/focus';
 import { D, F, SHEET_SPRING, STEP_MIN } from '@/lib/design';
 import { ago, feedList } from '@/lib/feed';
 import {
@@ -506,6 +507,7 @@ type PageProps = {
 };
 
 const Page = memo(function Page(props: PageProps) {
+  const showOnMap = useShowPhotoOnMap();
   const { photo, width, height, landscape, people, peekH, hideP, sheetP, hidden } = props;
   const [img, setImg] = useState<'loading' | 'ok' | 'error'>('loading');
   const taken = new Date(photo.taken_at);
@@ -594,6 +596,21 @@ const Page = memo(function Page(props: PageProps) {
             </Text>
           </View>
         </Pressable>
+        {/* 17.11: из просмотра — на карту, к месту и времени снимка */}
+        {hasPlace(photo) && (
+          <Pressable
+            onPress={() => showOnMap(photo)}
+            style={({ pressed }) => [styles.mapLink, pressed && { opacity: 0.7 }]}
+            hitSlop={{ top: 4, bottom: 4 }}
+            accessibilityRole="link"
+            accessibilityLabel={`${photo.place_name ?? 'Место снимка'}. Показать на карте`}
+          >
+            <Icon name="pin" size={16} color={D.sun} />
+            <Text style={styles.mapLinkText} numberOfLines={1}>
+              {photo.place_name ?? 'Место снимка'} · на карте
+            </Text>
+          </Pressable>
+        )}
         {photo.caption ? (
           <Pressable onPress={props.onDetails} accessibilityLabel="Подробности">
             <Text style={styles.caption} numberOfLines={3}>
@@ -624,6 +641,7 @@ type SheetProps = {
 };
 
 function DetailsSheet(props: SheetProps) {
+  const showOnMap = useShowPhotoOnMap();
   const { photo, near, people, peekH, bottomInset, hideP, fullP, hidden, control } = props;
   // 13.10 (№ «слои накладываются»): открытость шторки храним сама по себе — 0 свёрнута, 1 открыта.
   // Раньше её вычисляли из высоты, и при смене кадра она «застревала» посередине: дата и автор просвечивали
@@ -755,7 +773,21 @@ function DetailsSheet(props: SheetProps) {
                   <Text style={styles.sLikeCount}>{photo.like_count ?? 0}</Text>
                 </Pressable>
               </View>
-              {photo.place_name ? (
+              {hasPlace(photo) ? (
+                <Pressable
+                  onPress={() => showOnMap(photo)}
+                  style={({ pressed }) => [styles.placeRow, pressed && { opacity: 0.7 }]}
+                  accessibilityRole="link"
+                  accessibilityLabel={`${photo.place_name ?? 'Место снимка'}. Показать на карте`}
+                >
+                  <Icon name="pin" size={16} color={D.sun} />
+                  <Text style={styles.place} numberOfLines={1}>
+                    {photo.place_name ?? 'Место снимка'}
+                  </Text>
+                  <Text style={styles.placeGo}>На карте</Text>
+                  <Icon name="chevR" size={16} color={D.sun} />
+                </Pressable>
+              ) : photo.place_name ? (
                 <View style={styles.placeRow}>
                   <Icon name="pin" size={16} color={D.sun} />
                   <Text style={styles.place} numberOfLines={1}>
@@ -950,7 +982,10 @@ const styles = StyleSheet.create({
   sSub: { fontFamily: F.sans, fontSize: 13, color: 'rgba(244,239,230,0.55)' },
   sLike: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 4 },
   sLikeCount: { fontFamily: F.sansMedium, fontSize: 14, color: D.paper },
-  placeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16 },
+  placeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, minHeight: 44 }, // ≥ 44 pt — нажимается
+  placeGo: { fontFamily: F.sansSemi, fontSize: 14, color: D.sun },
+  mapLink: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 36 }, // + hitSlop 4/4 = 44 pt
+  mapLinkText: { flexShrink: 1, fontFamily: F.sansMedium, fontSize: 13, color: D.white },
   place: { flex: 1, fontFamily: F.sans, fontSize: 14, color: 'rgba(244,239,230,0.85)' },
   sCaption: { fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: D.paper, marginTop: 10 },
   who: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: D.night3, borderRadius: 20, height: 74, paddingHorizontal: 14, marginTop: 16 },
@@ -958,7 +993,7 @@ const styles = StyleSheet.create({
   whoAva: { width: 34, height: 34, borderRadius: 17, borderWidth: 2, borderColor: D.night3, margin: -2 },
   whoTitle: { fontFamily: F.sansSemi, fontSize: 15, color: D.paper },
   whoSub: { fontFamily: F.sans, fontSize: 13, color: 'rgba(244,239,230,0.55)' },
-  go: { width: 36, height: 36, borderRadius: 18, backgroundColor: D.sun, alignItems: 'center', justifyContent: 'center' },
+  go: { width: 36, height: 36, borderRadius: 18, backgroundColor: D.sunBtn, alignItems: 'center', justifyContent: 'center' },
   goneIcon: { width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(244,239,230,0.08)', alignItems: 'center', justifyContent: 'center' },
   goneTitle: { fontFamily: F.serif, fontSize: 30, color: D.paper, marginTop: 28, textAlign: 'center' },
   goneText: { fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: D.paper, opacity: 0.6, marginTop: 8, textAlign: 'center' },

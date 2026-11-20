@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   avatar: { width: 104, height: 104, borderRadius: 52, borderWidth: 3, borderColor: D.white, backgroundColor: D.paper2 },
   avatarEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: D.sun },
   avatarLetter: { fontFamily: F.serif, fontSize: 44, color: D.white },
-  cam: { position: 'absolute', left: 69.5, top: 70, width: 36, height: 36, borderRadius: 18, backgroundColor: D.sun, alignItems: 'center', justifyContent: 'center' },
+  cam: { position: 'absolute', left: 69.5, top: 70, width: 36, height: 36, borderRadius: 18, backgroundColor: D.sunBtn, alignItems: 'center', justifyContent: 'center' },
   change: { marginTop: 12, fontFamily: F.sansSemi, fontSize: 14, color: D.sun },
   fields: { paddingHorizontal: 24, marginTop: 26, gap: 18 },
   group: { gap: 8 },
@@ -209,6 +209,6 @@ const styles = StyleSheet.create({
   nickInput: { flex: 1, height: '100%', fontFamily: F.sans, fontSize: 16, color: D.ink, padding: 0 },
   hint: { fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: D.ink60 },
   bio: { height: 100, paddingTop: 16 },
-  button: { marginHorizontal: 24, backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
+  button: { marginHorizontal: 24, backgroundColor: D.sunBtn, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
 });

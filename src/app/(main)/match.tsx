@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   avaLetter: { fontFamily: F.sansSemi, fontSize: 16, color: D.white },
   authorName: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink },
   authorSub: { fontFamily: F.sans, fontSize: 13, color: D.ink60 },
-  button: { marginTop: 14, backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, paddingHorizontal: 20, alignItems: 'center' },
+  button: { marginTop: 14, backgroundColor: D.sunBtn, borderRadius: 999, paddingVertical: 17, paddingHorizontal: 20, alignItems: 'center' },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
   hide: { alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13 },
   links: { flexDirection: 'row', alignItems: 'center', marginTop: 32 - 13 },

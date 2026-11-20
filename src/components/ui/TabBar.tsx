@@ -60,5 +60,5 @@ const styles = StyleSheet.create({
   item: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 46, paddingHorizontal: 14, borderRadius: 23 },
   itemOn: { backgroundColor: D.paper, paddingLeft: 16, paddingRight: 18 },
   label: { fontFamily: F.sansSemi, fontSize: 14, color: D.ink },
-  add: { width: 48, height: 48, borderRadius: 24, backgroundColor: D.sun, alignItems: 'center', justifyContent: 'center', marginHorizontal: 4 },
+  add: { width: 48, height: 48, borderRadius: 24, backgroundColor: D.sunBtn, alignItems: 'center', justifyContent: 'center', marginHorizontal: 4 },
 });

@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   pillOff: { borderWidth: 1.2, borderColor: D.ink },
   pillText: { fontFamily: F.sansSemi, fontSize: 13, color: D.ink },
   note: { marginTop: 22, fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: D.ink60 },
-  button: { backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
+  button: { backgroundColor: D.sunBtn, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
   later: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink60 },
 });

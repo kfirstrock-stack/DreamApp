@@ -7,12 +7,18 @@ export const D = {
   ink40: '#A39A8C',
   line: '#D9D0C1',
   sun: '#FF5A36',
+  // Основная кнопка (17.11): белый текст. #FF5A36 к белому даёт 3,10:1 — ниже 4,5:1, поэтому заливка чуть темнее, тот же тон OKLCH
+  sunBtn: '#DC370C',
   sunSoft: '#FFE1D6',
   night: '#0F0E0C',
   night2: '#1C1A17',
   night3: '#2A2723',
   white: '#FFFFFF',
   mapBase: '#ECE5D8',
+  // Ошибка (17.11, C2b/C2c): на светлом — #B42318, на тёмном — #FF5A36 (#B42318 там даёт 2,93:1)
+  error: '#B42318',
+  errorSoft: 'rgba(180,35,24,0.1)',
+  errorOnDark: '#FF5A36',
 };
 
 export const F = {

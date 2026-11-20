@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   row: { marginHorizontal: 24, height: ROW, flexDirection: 'row' },
   weekBand: { position: 'absolute', left: 0, right: 0, top: 3, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,90,54,0.12)' },
   cell: { height: ROW, alignItems: 'center' },
-  dayOn: { position: 'absolute', top: 3, width: 34, height: 34, borderRadius: 17, backgroundColor: D.sun },
+  dayOn: { position: 'absolute', top: 3, width: 34, height: 34, borderRadius: 17, backgroundColor: D.sunBtn },
   dayText: { marginTop: 10.5, fontFamily: F.sans, fontSize: 15, lineHeight: 19, color: D.ink },
   dayTextBold: { fontFamily: F.sansSemi },
   dot: { position: 'absolute', top: 33.5, width: 4, height: 4, borderRadius: 2, backgroundColor: D.sun },
@@ -295,6 +295,6 @@ const styles = StyleSheet.create({
   band: { position: 'absolute', left: 0, right: 0, top: ITEM * 1.5 - 25, height: 50, borderRadius: 14, backgroundColor: D.paper },
   item: { height: ITEM, alignItems: 'center', justifyContent: 'center' },
   itemText: { fontFamily: F.mono, fontSize: 28, color: D.ink },
-  button: { marginTop: 18.5, marginHorizontal: 24, backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
+  button: { marginTop: 18.5, marginHorizontal: 24, backgroundColor: D.sunBtn, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
 });

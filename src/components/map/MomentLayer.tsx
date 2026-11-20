@@ -76,7 +76,7 @@ const MomentPin = memo(function MomentPin({ photo, minutes, active, suppressed, 
             <Text style={styles.badgeText}>+{badge}</Text>
           </View>
         )}
-        <View style={[styles.chip, stack && { marginTop: 8 }, { backgroundColor: active ? D.sun : D.ink }]}>
+        <View style={[styles.chip, stack && { marginTop: 8 }, { backgroundColor: active ? D.sunBtn : D.ink }]}>
           <Text style={styles.chipText}>{time}</Text>
         </View>
       </Pressable>
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   img: { width: '100%', height: '100%' },
   badge: {
     position: 'absolute', top: -6, right: -12, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
-    backgroundColor: D.sun, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: D.sunBtn, alignItems: 'center', justifyContent: 'center',
   },
   badgeText: { fontFamily: F.mono, fontSize: 11, color: D.white },
   chip: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },

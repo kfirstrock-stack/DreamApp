@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useCanGoBack, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Alert, BackHandler, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { Image } from 'expo-image';
 import MapView from 'react-native-maps';
@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { HALO, MomentLayer, PIN, type Pin } from '@/components/map/MomentLayer';
 import { RecentSheet } from '@/components/map/RecentSheet';
+import { UploadBanner } from '@/components/map/UploadBanner';
 import { StackFan } from '@/components/map/StackFan';
 import { RollingTime } from '@/components/time/RollingTime';
 import { DateSheet } from '@/components/time/DateSheet';
@@ -26,11 +27,12 @@ import { SheetGrab } from '@/components/ui/SheetGrab';
 import { TAB_BAR_SPACE, TabBar } from '@/components/ui/TabBar';
 import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING, STEP_MIN, softShadow } from '@/lib/design';
-import { consumeMapFocus } from '@/lib/focus';
+import { clearMapOrigin, consumeMapFocus, returnToMapOrigin, useMapOrigin } from '@/lib/focus';
+import { currentPosition } from '@/lib/location';
 import { openPhotoFeed } from '@/lib/feed';
 import { hideSplash, isOnboarded } from '@/lib/onboarding';
 import { project, regionBounds, regionRadiusM, type MapRegion } from '@/lib/geo';
-import { fetchLatestIn, fetchPhotosV2 } from '@/lib/photos';
+import { fetchLatestIn, fetchPhotosV2, getFreshAdded, getFreshPhotos, onFreshPhotos, settleFreshPhotos } from '@/lib/photos';
 import {
   STEPS, bigLabel, bucketCount, bucketIndex, bucketStart, clock, emptyRangeTitle, isCurrentRange, momentSuffix, position,
   rangeEnd, rangeLabel, rangeStart, shiftRange, ticks, untilLabel, type Step,
@@ -43,14 +45,20 @@ let scaleModePref: ScaleMode = 'full';
 let nudged = false; // «кивок» ручки — один раз за запуск
 // Кэш снимков по диапазону и области: при смене шага/дня показываем сразу, обновляем в фоне
 const photoCache = new Map<string, Photo[]>();
+// какой промежуток и область лежат под ключом кэша — чтобы после публикации сбросить только их
+const cacheMeta = new Map<string, { from: number; to: number; b: { minLat: number; maxLat: number; minLng: number; maxLng: number } }>();
 const cacheKey = (step: Step, start: Date, r: MapRegion) =>
   `${step}|${start.getTime()}|${r.latitude.toFixed(3)}|${r.longitude.toFixed(3)}|${r.latitudeDelta.toFixed(3)}`;
 // Места, которые уже встречались на карте: название в поиске есть, даже когда в выбранный день пусто
 const knownPlaces = new Map<string, { lat: number; lng: number; name: string }>();
 const loadRange = async (step: Step, start: Date, r: MapRegion) => {
   const limit = step === 'week' ? 3000 : step === 'day' ? 2000 : 800;
-  const list = await fetchPhotosV2(regionBounds(r, 1.6), start, rangeEnd(step, start), limit);
-  photoCache.set(cacheKey(step, start, r), list);
+  const b = regionBounds(r, 1.6), end = rangeEnd(step, start);
+  const list = await fetchPhotosV2(b, start, end, limit);
+  const key = cacheKey(step, start, r);
+  photoCache.set(key, list);
+  cacheMeta.set(key, { from: start.getTime(), to: end.getTime(), b });
+  settleFreshPhotos(list); // только что опубликованные уже пришли с сервера
   for (const p of list) if (p.place_name) knownPlaces.set(`${p.lat.toFixed(4)},${p.lng.toFixed(4)}`, { lat: p.lat, lng: p.lng, name: p.place_name });
   return list;
 };
@@ -106,6 +114,8 @@ const plural = (n: number, one: string, few: string, many: string) => {
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { session, ready } = useAuth();
+  const mapOrigin = useMapOrigin();
+  const canPop = useCanGoBack();
   const mapRef = useRef<MapView>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [sheet, setSheet] = useState({ y: 0, h: 0 }); // где карточка шкалы — фото ставим выше неё
@@ -153,12 +163,50 @@ export default function MapScreen() {
   const now = useSharedValue(index * STEP_MIN + STEP_MIN / 2);
   const [jump, setJump] = useState<{ i: number; key: number } | null>(null);
 
-  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [serverPhotos, setPhotos] = useState<Photo[]>([]);
+  // Только что опубликованные (QA 17.11): на карте сразу после insert, не дожидаясь запроса к серверу
+  const freshList = useSyncExternalStore(onFreshPhotos, getFreshPhotos);
+  const freshAdded = useSyncExternalStore(onFreshPhotos, getFreshAdded);
+  const photos = useMemo(() => {
+    if (!freshList.length) return serverPhotos;
+    const from = start.getTime(), to = rangeEnd(step, start).getTime();
+    const b = regionBounds(region, 1.6);
+    const have = new Set(serverPhotos.map((p) => p.id));
+    const extra = freshList.filter((p) => {
+      const t = new Date(p.taken_at).getTime();
+      return !have.has(p.id) && t >= from && t < to && p.lat >= b.minLat && p.lat <= b.maxLat && p.lng >= b.minLng && p.lng <= b.maxLng;
+    });
+    return extra.length ? [...serverPhotos, ...extra] : serverPhotos;
+  }, [serverPhotos, freshList, start, step, region]);
   const [loaded, setLoaded] = useState(false);
   const [offline, setOffline] = useState(false);
   const [reload, setReload] = useState(0);
   const [fan, setFan] = useState<{ photos: Photo[]; origin: { x: number; y: number }; closing: boolean } | null>(null);
   const firstFocus = useRef(true);
+  // пользователь трогал карту, шкалу, «Где я» и т. п. после начала загрузки пачки — не перебиваем его автоперелётом
+  const mapTouchedAt = useRef(0);
+  const markUser = useCallback(() => {
+    mapTouchedAt.current = Date.now();
+  }, []);
+
+  // Ссылка «на карте»: системная кнопка назад — только пока карта в фокусе (не перехватываем её у поиска и шторок)
+  useFocusEffect(
+    useCallback(() => {
+      if (!mapOrigin) return;
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        returnToMapOrigin();
+        return true;
+      });
+      return () => sub.remove();
+    }, [mapOrigin]),
+  );
+  const goOrigin = useCallback(() => returnToMapOrigin(), []);
+  const edgeBack = Gesture.Pan()
+    .activeOffsetX(16)
+    .failOffsetY([-28, 28])
+    .onEnd((e) => {
+      if (e.translationX > 64 || e.velocityX > 500) scheduleOnRN(goOrigin);
+    });
 
   // Регион, при котором точка встаёт посередине свободной зоны — между поиском и карточкой шкалы
   const focusRegion = useCallback(
@@ -200,6 +248,7 @@ export default function MapScreen() {
   );
   // Смена шага: выбранный момент остаётся выбранным, шкала перестраивается
   const changeStep = (next: Step) => {
+    markUser();
     setStepMenu(false);
     if (next === step) return;
     // меню закрывается сразу, перестройка шкалы — следующим кадром
@@ -330,10 +379,8 @@ export default function MapScreen() {
       try {
         const perm = await Location.getForegroundPermissionsAsync();
         if (perm.granted) {
-          const pos =
-            (await Location.getLastKnownPositionAsync({ maxAge: 10 * 60 * 1000 })) ??
-            (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
-          here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          const pos = await currentPosition();
+          if (pos) here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         }
       } catch {}
       if (here) {
@@ -395,6 +442,33 @@ export default function MapScreen() {
       clearTimeout(t);
     };
   }, [region, start, step, reload]);
+
+  // Новый снимок записан — устарели только области, куда он попадает. В пачке снимки идут подряд:
+  // копим их и сбрасываем кэш раз в 500 мс, а не на каждый кадр (QA recheck 17.11)
+  const freshSeen = useRef(freshAdded);
+  const staleFor = useRef(new Map<string, Photo>());
+  useEffect(() => {
+    if (freshAdded === freshSeen.current) return;
+    freshSeen.current = freshAdded;
+    for (const p of getFreshPhotos()) staleFor.current.set(p.id, p);
+    const t = setTimeout(() => {
+      const list = [...staleFor.current.values()];
+      staleFor.current.clear();
+      for (const [key, meta] of cacheMeta) {
+        const hit = list.some((p) => {
+          const at = new Date(p.taken_at).getTime();
+          return at >= meta.from && at < meta.to && p.lat >= meta.b.minLat && p.lat <= meta.b.maxLat && p.lng >= meta.b.minLng && p.lng <= meta.b.maxLng;
+        });
+        if (hit) {
+          photoCache.delete(key);
+          cacheMeta.delete(key);
+        }
+      }
+      setReload((k) => k + 1);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [freshAdded]);
+
 
   // Открыли меню шага — заранее подгружаем остальные шаги для этого момента
   useEffect(() => {
@@ -567,13 +641,19 @@ export default function MapScreen() {
   const fanClosed = useCallback(() => setFan(null), []);
 
   const locateMe = async () => {
+    markUser();
     const perm = await Location.requestForegroundPermissionsAsync();
     if (!perm.granted) return Alert.alert('Нет доступа к геопозиции', 'Разрешите его в настройках телефона.');
-    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    flyTo(pos.coords.latitude, pos.coords.longitude, 0.008);
+    // iPad без GPS или выключенные службы геолокации: getCurrentPositionAsync падает или висит
+    const pos = await currentPosition();
+    if (pos) flyTo(pos.coords.latitude, pos.coords.longitude, 0.008);
+    else {
+      Alert.alert('Не удалось определить место', 'Проверьте, что службы геолокации включены, и попробуйте ещё раз.');
+    }
   };
 
   const toLatest = async () => {
+    markUser();
     // ищем всё шире: рядом, затем по городу
     let p = await fetchLatestIn(regionBounds(region, 1.5)).catch(() => null);
     if (!p) p = await fetchLatestIn(regionBounds(region, 30)).catch(() => null);
@@ -635,6 +715,12 @@ export default function MapScreen() {
         onRegionChange={(r) => {
           regionSV.value = r;
         }}
+        onTouchStart={() => {
+          mapTouchedAt.current = Date.now();
+        }}
+        onPanDrag={() => {
+          mapTouchedAt.current = Date.now();
+        }}
         onRegionChangeComplete={(r) => {
           if (flyTimer.current) clearTimeout(flyTimer.current);
           AsyncStorage.setItem(LAST_REGION_KEY, JSON.stringify(r)).catch(() => {}); // прошлое место — для следующего запуска
@@ -662,6 +748,17 @@ export default function MapScreen() {
 
       {/* Верх: поиск (название места) и слои — B1 */}
       <View style={[styles.top, { top: insets.top + 8 }]} pointerEvents="box-none">
+        {mapOrigin && (
+          <Pressable
+            onPress={returnToMapOrigin}
+            style={({ pressed }) => [styles.backPill, pressed && { opacity: 0.8 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Назад"
+          >
+            <Icon name="chevL" size={18} color={D.ink} />
+            <Text style={styles.backPillText}>Назад</Text>
+          </Pressable>
+        )}
         <Pressable style={styles.search} onPress={() => router.push({ pathname: '/search', params: { lat: String(region.latitude), lng: String(region.longitude) } })}>
           <Icon name="search" size={20} color={D.ink} />
           <Text style={[styles.searchText, !placeName && { color: D.ink60 }]} numberOfLines={1}>
@@ -671,6 +768,16 @@ export default function MapScreen() {
         <RoundButton icon="layers" size={46} label="Вид карты" onPress={() => setLayers(true)} />
       </View>
 
+      {mapOrigin && !canPop && !layers && !dateSheet && !recent && !fan && !stepMenu && (
+        <GestureDetector gesture={edgeBack}>
+          <View
+            style={[styles.edgeBack, { top: insets.top + 62, bottom: sheetBottom + (sheet.h || 0) }]}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          />
+        </GestureDetector>
+      )}
+
       {/* «Где я» — справа над шкалой — B1 */}
       {sheet.h > 0 && (
         <View style={[styles.locate, { bottom: sheetBottom + sheet.h + 18 }]} pointerEvents="box-none">
@@ -678,6 +785,21 @@ export default function MapScreen() {
           <RoundButton icon="locate" label="Где я" onPress={locateMe} />
         </View>
       )}
+
+      {/* C2c · загрузка пачки снимков (17.11) */}
+      <UploadBanner
+        top={insets.top + (offline ? 116 : 60)} /* под плашкой «Нет сети», а не поверх неё */
+        onShow={(f) => {
+          flyTo(f.lat, f.lng, 0.004);
+          goTo(f.at);
+        }}
+        onAutoShow={(f, since) => {
+          if (mapTouchedAt.current > since) return;
+          flyTo(f.lat, f.lng, 0.004);
+          goTo(f.at);
+        }}
+        onFinished={() => setReload((k) => k + 1)}
+      />
 
       {offline && (
         <Animated.View entering={FadeIn} exiting={FadeOut} style={[styles.banner, { top: insets.top + 64 }]}>
@@ -770,6 +892,7 @@ export default function MapScreen() {
               now={now}
               index={indexSV}
               onIndexChange={onScrub}
+              onUserTouch={markUser}
               jumpTo={jump}
               footer={
                 mode === 'full' ? (
@@ -794,14 +917,20 @@ export default function MapScreen() {
               header={
             <View style={styles.head}>
               <View style={styles.dayRow}>
-                <Pressable hitSlop={10} onPress={() => setDay(shiftRange(step, start, -1))} accessibilityLabel="Назад">
+                <Pressable hitSlop={10} onPress={() => {
+                  markUser();
+                  setDay(shiftRange(step, start, -1));
+                }} accessibilityLabel="Назад">
                   <Icon name="chevL" size={16} color={D.ink60} />
                 </Pressable>
                 {/* B3: тап по дате — выбор даты и времени */}
                 <Pressable hitSlop={{ top: 10, bottom: 10 }} onPress={() => setDateSheet(true)} accessibilityRole="button" accessibilityLabel="Выбрать дату и время">
                   <Text style={styles.day}>{rangeLabel(step, start)}</Text>
                 </Pressable>
-                <Pressable hitSlop={10} disabled={isToday} onPress={() => setDay(shiftRange(step, start, 1))} accessibilityLabel="Вперёд">
+                <Pressable hitSlop={10} disabled={isToday} onPress={() => {
+                  markUser();
+                  setDay(shiftRange(step, start, 1));
+                }} accessibilityLabel="Вперёд">
                   <Icon name="chevR" size={16} color={isToday ? D.line : D.ink60} />
                 </Pressable>
                 <View style={{ flex: 1 }} />
@@ -864,7 +993,7 @@ export default function MapScreen() {
 
       <TabBar
         active="map"
-        onMap={() => {}}
+        onMap={() => clearMapOrigin()}
         onMoments={() => openMoment(region.latitude, region.longitude, regionRadiusM(region))}
         onAdd={() => router.push('/new')}
         onProfile={() => router.push(session ? '/profile' : '/sign-in')}
@@ -916,6 +1045,7 @@ export default function MapScreen() {
           bounds={regionBounds(region, 1.6)}
           onClose={() => setDateSheet(false)}
           onPick={(at) => {
+            markUser();
             setDateSheet(false);
             anchor.current = at;
             goTo(at);
@@ -952,6 +1082,13 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: D.mapBase },
   top: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 1000, elevation: 30 },
+  backPill: {
+    height: 46, minWidth: 44, borderRadius: 23, backgroundColor: D.white, flexDirection: 'row', alignItems: 'center',
+    paddingLeft: 12, paddingRight: 16, gap: 2,
+    shadowColor: '#17120D', shadowOpacity: 0.12, shadowRadius: 9, shadowOffset: { width: 0, height: 6 }, elevation: 6,
+  },
+  backPillText: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink },
+  edgeBack: { position: 'absolute', left: 0, width: 28, zIndex: 900, elevation: 20 },
   search: {
     flex: 1, height: 46, borderRadius: 23, backgroundColor: D.white, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16,
     shadowColor: '#17120D', shadowOpacity: 0.12, shadowRadius: 9, shadowOffset: { width: 0, height: 6 }, elevation: 6,
@@ -987,7 +1124,7 @@ const styles = StyleSheet.create({
   b2Head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   b2Title: { flex: 1, fontFamily: F.sansSemi, fontSize: 17, color: D.ink },
   b2Text: { fontFamily: F.sans, fontSize: 14, lineHeight: 20, color: D.ink60, marginTop: -2 },
-  b2Btn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: D.sun, borderRadius: 999, paddingLeft: 16, paddingRight: 14, paddingVertical: 10 },
+  b2Btn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: D.sunBtn, borderRadius: 999, paddingLeft: 16, paddingRight: 14, paddingVertical: 10 },
   b2BtnText: { fontFamily: F.sansSemi, fontSize: 14, color: D.white },
   sheet: {
     position: 'absolute', left: 12, right: 12, backgroundColor: D.white, borderRadius: 28, paddingTop: 16, paddingBottom: 6, ...softShadow, zIndex: 1000, elevation: 30,

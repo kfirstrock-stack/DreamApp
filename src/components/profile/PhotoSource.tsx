@@ -34,7 +34,7 @@ export function PhotoSource({ onPick, onClose }: { onPick: (src: 'camera' | 'gal
           </Pressable>
           <Text style={styles.sheetTitle}>Фото профиля</Text>
           <View style={styles.tiles}>
-            <Pressable onPress={() => onPick('camera')} style={({ pressed }) => [styles.tile, { backgroundColor: D.sun }, pressed && { opacity: 0.9 }]}>
+            <Pressable onPress={() => onPick('camera')} style={({ pressed }) => [styles.tile, { backgroundColor: D.sunBtn }, pressed && { opacity: 0.9 }]}>
               <Icon name="camera" size={30} color={D.white} />
               <View style={styles.tileText}>
                 <Text style={[styles.tileTitle, { color: D.white }]}>Снять</Text>

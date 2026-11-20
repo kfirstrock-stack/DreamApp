@@ -1,4 +1,4 @@
-// A4 · Вход по почте и A5 · Ввод кода (8 цифр, Supabase OTP). Новый пользователь → A6, иначе — назад
+// A4 · Вход по почте и A5 · Ввод кода (6 цифр, Supabase OTP). Новый пользователь → A6, иначе — назад
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -14,7 +14,7 @@ import { photoSource } from '@/lib/photos';
 import { leaveAuth, markOnboarded } from '@/lib/onboarding';
 import { supabase } from '@/lib/supabase';
 
-const CODE = 8;
+const CODE = Number(process.env.EXPO_PUBLIC_OTP_LENGTH ?? 6);
 // №2 (12.10): опечатка в домене частой почты — подсказываем «Возможно, …@gmail.com?»
 const DOMAINS = ['gmail.com', 'mail.ru', 'yandex.ru', 'ya.ru', 'icloud.com', 'bk.ru', 'inbox.ru', 'list.ru', 'rambler.ru', 'outlook.com', 'hotmail.com', 'yahoo.com', 'me.com'];
 // настоящие домены, похожие на частые, — им ничего не подсказываем
@@ -438,7 +438,8 @@ function CodeStep({ email, onBack, onResend }: { email: string; onBack: () => vo
           <Text style={styles.a5Sub}>
             Отправили {CODE} цифр на {email}
           </Text>
-          <Pressable onPress={() => input.current?.focus()} style={styles.cells}>
+          <View style={styles.cellsWrap}>
+          <View style={styles.cells} pointerEvents="none">
             {Array.from({ length: CODE }, (_, i) => {
               const active = !busy && i === code.length;
               return (
@@ -447,7 +448,7 @@ function CodeStep({ email, onBack, onResend }: { email: string; onBack: () => vo
                 </View>
               );
             })}
-          </Pressable>
+          </View>
           <TextInput
             ref={input}
             value={code}
@@ -458,8 +459,11 @@ function CodeStep({ email, onBack, onResend }: { email: string; onBack: () => vo
             textContentType="oneTimeCode"
             autoComplete="one-time-code"
             maxLength={CODE}
-            style={styles.hidden}
+            caretHidden
+            contextMenuHidden={false}
+            style={styles.overlay}
           />
+          </View>
           {wrong ? <Text style={styles.wrong}>Код не подошёл. Проверьте его или запросите новый.</Text> : null}
           {left > 0 ? (
             <Text style={styles.resend}>Отправить ещё раз через 0:{String(left).padStart(2, '0')}</Text>
@@ -505,7 +509,7 @@ const styles = StyleSheet.create({
     paddingRight: 12,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: D.sun,
+    backgroundColor: D.sunBtn,
   },
   placeTagText: { fontFamily: F.sansSemi, fontSize: 12, color: D.white },
   placeTagReal: {
@@ -518,7 +522,7 @@ const styles = StyleSheet.create({
     paddingRight: 12,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: D.sun,
+    backgroundColor: D.sunBtn,
   },
   polaroid: {
     position: 'absolute',
@@ -547,7 +551,7 @@ const styles = StyleSheet.create({
   error: { marginTop: 8, fontFamily: F.sans, fontSize: 13, color: D.sun },
   suggest: { marginTop: 10, marginLeft: 4, fontFamily: F.sans, fontSize: 14, color: 'rgba(244,239,230,0.7)' },
   suggestAddr: { fontFamily: F.sansSemi, color: D.sun },
-  button: { backgroundColor: D.sun, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
+  button: { backgroundColor: D.sunBtn, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
   guest: { fontFamily: F.sansSemi, fontSize: 15, color: 'rgba(244,239,230,0.7)' },
   // A4 · с возвращением
@@ -565,7 +569,9 @@ const styles = StyleSheet.create({
   cellOn: { borderWidth: 2, borderColor: D.sun },
   cellText: { fontFamily: F.mono, fontSize: 26, color: D.paper },
   caret: { width: 2, height: 26, borderRadius: 1, backgroundColor: D.sun },
-  hidden: { position: 'absolute', width: 1, height: 1, opacity: 0 },
+  cellsWrap: { position: 'relative' },
+  // поле поверх клеток: на iPad скрытое поле 1×1 не получает фокус
+  overlay: { position: 'absolute', left: 0, right: 0, top: 22, height: 60, color: 'transparent', backgroundColor: 'transparent', opacity: 0.02, fontSize: 1 },
   wrong: { marginTop: 16, fontFamily: F.sans, fontSize: 14, color: D.sun },
   resend: { marginTop: 20, fontFamily: F.sans, fontSize: 14, color: 'rgba(244,239,230,0.5)' },
 });

@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
   privacy: { marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 10 },
   privacyText: { fontFamily: F.sans, fontSize: 14, color: D.ink60 },
   dotsRow: { position: 'absolute', left: 32, height: 60, justifyContent: 'center' },
-  morph: { position: 'absolute', right: 32, backgroundColor: D.sun, overflow: 'hidden' },
+  morph: { position: 'absolute', right: 32, backgroundColor: D.sunBtn, overflow: 'hidden' },
   morphPress: { flex: 1 },
   word: { flexDirection: 'row' },
   // шире самой кнопки (она обрезает лишнее), чтобы слово мерилось и центрировалось одинаково при любой ширине
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 4 },
   chipWrap: { overflow: 'visible' },
-  chip: { position: 'absolute', left: 0, top: 0, transformOrigin: 'left top', backgroundColor: D.sun, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  chip: { position: 'absolute', left: 0, top: 0, transformOrigin: 'left top', backgroundColor: D.sunBtn, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   chipText: { fontFamily: F.mono, fontSize: 12, color: D.white },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
 });
