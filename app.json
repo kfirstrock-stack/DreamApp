@@ -70,6 +70,18 @@
     "experiments": {
       "typedRoutes": false,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e8b304ec-05b1-4e2d-a133-ff7309a97d58"
+      }
+    },
+    "owner": "konstantinkayf",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e8b304ec-05b1-4e2d-a133-ff7309a97d58"
     }
   }
 }
