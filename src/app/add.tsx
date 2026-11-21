@@ -175,8 +175,8 @@ export default function PublishScreen() {
           update({ takenAt: at, timeSource: 'manual' });
           setView('confirm');
         }}
-        // без времени в снимке Confirm показать нечего — к выбору фото (C2): /new снят с истории, back увёл бы на карту
-        onCancel={() => (draft.takenAt == null ? router.replace('/new') : setView('confirm'))}
+        // «Отмена» только закрывает пикер: к месту, если время ещё не задано, иначе к форме. Черновик не бросаем.
+        onCancel={() => setView(draft.takenAt == null ? 'place' : 'confirm')}
       />
     );
   return (

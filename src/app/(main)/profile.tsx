@@ -33,7 +33,7 @@ export default function ProfileScreen() {
   const { width } = useWindowDimensions();
   const content = width - 40;
   const cardW = content - 15;
-  const { session, profile } = useAuth();
+  const { session, profile, ready } = useAuth();
   const uid = session?.user.id;
   const [stats, setStats] = useState<Stats | null>(null);
   const [matches, setMatches] = useState<Match[] | null>(null);
@@ -53,9 +53,10 @@ export default function ProfileScreen() {
 
   // вышли из аккаунта — на вход, но не во время отрисовки (иначе React ругается «Cannot update a component…»)
   useEffect(() => {
+    if (!ready) return;
     if (!session) router.replace('/sign-in');
-  }, [session]);
-  if (!session) return <View style={styles.root} />;
+  }, [ready, session]);
+  if (!ready || !session) return <View style={styles.root} />;
 
   const name = profile?.display_name || profile?.username || 'Вы';
   const tile = (content - 16) / 3;
@@ -116,7 +117,9 @@ export default function ProfileScreen() {
             </Pressable>
           )}
         </View>
-        {matches && matches.length > 0 ? (
+        {matches == null ? (
+          <View style={[styles.empty, { minHeight: 96, opacity: 0 }]} />
+        ) : matches.length > 0 ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}

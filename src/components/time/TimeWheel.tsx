@@ -1,8 +1,8 @@
 // Колесо времени: три строки, выбранная — посередине на светлой плашке (B3, C5)
 import * as Haptics from 'expo-haptics';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
+import Animated, { runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { D, F } from '@/lib/design';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -20,17 +20,44 @@ type Props = {
 export function TimeWheel({ count, initial, slotMin, onChange, item = 37, size = 28, band = 50 }: Props) {
   const y = useSharedValue(initial * item);
   const last = useRef(initial);
+  const list = useRef<Animated.ScrollView>(null);
+  const placed = useRef(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+  }, []);
+
+  const indexOf = (off: number) => Math.max(0, Math.min(count - 1, Math.round(off / item)));
+
+  const settle = (off: number, haptic: boolean) => {
+    const i = indexOf(off);
+    if (i === last.current) return;
+    last.current = i;
+    onChange(i);
+    if (haptic) Haptics.selectionAsync().catch(() => {});
+  };
+
+  // На вебе contentOffset и onMomentumScrollEnd часто не срабатывают
+  // (колесо мыши, отсутствие инерции) — слот обновляем с каждого onScroll.
+  const report = (off: number) => {
+    settle(off, false);
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => settle(off, true), 80);
+  };
+
   const onScroll = useAnimatedScrollHandler((e) => {
     y.value = e.contentOffset.y;
+    runOnJS(report)(e.contentOffset.y);
   });
-  const settle = (off: number) => {
-    const i = Math.max(0, Math.min(count - 1, Math.round(off / item)));
-    if (i !== last.current) {
-      last.current = i;
-      onChange(i);
-      Haptics.selectionAsync().catch(() => {});
-    }
+
+  const snapTo = (i: number) => {
+    const next = Math.max(0, Math.min(count - 1, i));
+    last.current = next;
+    onChange(next);
+    list.current?.scrollTo({ y: next * item, animated: true });
   };
+
   const cur = `${pad(Math.floor((last.current * slotMin) / 60))}:${pad((last.current * slotMin) % 60)}`;
   return (
     <View
@@ -43,22 +70,29 @@ export function TimeWheel({ count, initial, slotMin, onChange, item = 37, size =
       onAccessibilityAction={(e) => {
         const name = e.nativeEvent.actionName;
         if (name !== 'increment' && name !== 'decrement') return;
-        const next = Math.max(0, Math.min(count - 1, last.current + (name === 'increment' ? 1 : -1)));
-        settle(next * item);
+        snapTo(last.current + (name === 'increment' ? 1 : -1));
       }}
     >
-      <View style={[styles.band, { top: item * 1.5 - band / 2, height: band }]} />
+      <View pointerEvents="none" style={[styles.band, { top: item * 1.5 - band / 2, height: band }]} />
       <Animated.ScrollView
+        ref={list}
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         snapToInterval={item}
+        disableIntervalMomentum
         decelerationRate="fast"
         contentOffset={{ x: 0, y: initial * item }}
         contentContainerStyle={{ paddingVertical: item }}
-        onMomentumScrollEnd={(e) => settle(e.nativeEvent.contentOffset.y)}
+        onLayout={() => {
+          // web часто игнорирует contentOffset — выставляем старт после вёрстки
+          if (placed.current) return;
+          placed.current = true;
+          list.current?.scrollTo({ y: initial * item, animated: false });
+        }}
+        onMomentumScrollEnd={(e) => settle(e.nativeEvent.contentOffset.y, true)}
         onScrollEndDrag={(e) => {
-          if (!e.nativeEvent.velocity || Math.abs(e.nativeEvent.velocity.y) < 0.05) settle(e.nativeEvent.contentOffset.y);
+          if (!e.nativeEvent.velocity || Math.abs(e.nativeEvent.velocity.y) < 0.05) settle(e.nativeEvent.contentOffset.y, true);
         }}
       >
         {Array.from({ length: count }, (_, i) => (

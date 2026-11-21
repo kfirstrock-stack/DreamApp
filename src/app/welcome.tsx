@@ -133,20 +133,23 @@ export default function Welcome() {
     });
 
   return (
-    <GestureDetector gesture={pan}>
-      <Animated.View style={{ flex: 1, backgroundColor: D.paper }}>
-        <StatusBar style={page === 0 ? 'light' : 'dark'} />
+    <View style={{ flex: 1, backgroundColor: D.paper }}>
+      <StatusBar style={page === 0 ? 'light' : 'dark'} />
+      <GestureDetector gesture={pan}>
         <Animated.View style={[StyleSheet.absoluteFill, under]}>
           {/* A1 — верхний слой: тёмная «шторка» уезжает и открывает бумагу A2 под собой */}
           <A2 progress={progress} width={width} />
           <A3 progress={progress} width={width} />
           <A1 progress={progress} width={width} />
-          <Skip progress={progress} active={page < LAST} onPress={toSignIn} />
-          <Bottom progress={progress} onNext={next} />
         </Animated.View>
-        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: D.night }, curtain]} />
+      </GestureDetector>
+      {/* Кнопки вне жеста листания — иначе первый клик на вебе съедается пан-хандлером */}
+      <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, under]}>
+        <Skip progress={progress} active={page < LAST} onPress={toSignIn} />
+        <Bottom progress={progress} onNext={next} />
       </Animated.View>
-    </GestureDetector>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: D.night }, curtain]} />
+    </View>
   );
 }
 
@@ -370,9 +373,9 @@ function A3({ progress, width }: { progress: P; width: number }) {
       </Animated.View>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, link]}>
         <Image source={ART.a3dash} style={at(119.2, 359.4, 161.67, 49.67)} contentFit="contain" />
-        <View style={[at(132, 404, 0, 0), styles.chipWrap]}>
+        <View style={[at(132, 404, 160, 36), styles.chipWrap]}>
           <View style={[styles.chip, { transform: [{ scale: s }] }]}>
-            <Text style={styles.chipText}>≈ 60 м · 2 минуты</Text>
+            <Text style={styles.chipText} numberOfLines={1}>≈ 60 м · 2 минуты</Text>
           </View>
         </View>
       </Animated.View>
@@ -418,6 +421,6 @@ const styles = StyleSheet.create({
   dot: { width: 7, height: 7, borderRadius: 4 },
   chipWrap: { overflow: 'visible' },
   chip: { position: 'absolute', left: 0, top: 0, transformOrigin: 'left top', backgroundColor: D.sunBtn, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  chipText: { fontFamily: F.mono, fontSize: 12, color: D.white },
+  chipText: { fontFamily: F.mono, fontSize: 12, color: D.white, flexShrink: 0 },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
 });

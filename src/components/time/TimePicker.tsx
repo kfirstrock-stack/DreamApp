@@ -1,7 +1,7 @@
 // C5 · Время вручную — общий для C3 (add.tsx) и C2b (batch.tsx). Вынесено из add.tsx 17.11 без изменений вида
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BackHandler, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,12 +32,25 @@ export function TimePicker({ draft, onDone, onCancel }: { draft: Pick<Draft, 'ur
   const base = draft.takenAt ?? new Date();
   const [day, setDay] = useState(() => new Date(base.getFullYear(), base.getMonth(), base.getDate()));
   const [slot, setSlot] = useState(() => Math.floor((base.getHours() * 60 + base.getMinutes()) / SLOT));
+  const slotRef = useRef(slot);
+  const pickSlot = (i: number) => {
+    slotRef.current = i;
+    setSlot(i);
+  };
   const today = new Date();
   const isToday = day.toDateString() === today.toDateString();
   const shift = (n: number) => setDay((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n));
+  // Локальные часы выбранного дня, без UTC. Слот берём из ref — на вебе
+  // состояние иначе может отстать от видимого ряда (колесо мыши без momentum).
   const done = () => {
-    const at = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, slot * SLOT);
-    onDone(at > today ? new Date(today.getTime() - 60000) : at);
+    const s = slotRef.current;
+    const at = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+    at.setHours(Math.floor((s * SLOT) / 60), (s * SLOT) % 60, 0, 0);
+    if (at > today) {
+      const max = Math.floor((today.getHours() * 60 + today.getMinutes()) / SLOT);
+      at.setHours(Math.floor((max * SLOT) / 60), (max * SLOT) % 60, 0, 0);
+    }
+    onDone(at);
   };
   return (
     <View style={{ flex: 1, backgroundColor: D.night }}>
@@ -70,7 +83,7 @@ export function TimePicker({ draft, onDone, onCancel }: { draft: Pick<Draft, 'ur
         </View>
         <Text style={[styles.label, { marginTop: 24 }]}>ВРЕМЯ</Text>
         <View>
-          <TimeWheel count={96} initial={slot} slotMin={SLOT} onChange={setSlot} item={43} size={30} band={54} />
+          <TimeWheel count={96} initial={slot} slotMin={SLOT} onChange={pickSlot} item={43} size={30} band={54} />
         </View>
         <Text style={styles.c5Note}>Если не помните точно — укажите примерно. Совпадения ищем в окне ±15 минут.</Text>
         <Pressable onPress={done} style={({ pressed }) => [styles.button, { marginTop: 32 }, pressed && { opacity: 0.88 }]}>

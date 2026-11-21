@@ -8,10 +8,6 @@ import Animated, {
   FadeOut,
   SlideInDown,
   SlideOutDown,
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useSharedValue,
-  type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -19,6 +15,7 @@ import { D, F, SHEET_SPRING } from '@/lib/design';
 import { fetchTimeBuckets } from '@/lib/photos';
 import type { Step } from '@/lib/timeSteps';
 import type { Bounds } from '@/lib/types';
+import { TimeWheel } from '@/components/time/TimeWheel';
 import { SheetGrab } from '@/components/ui/SheetGrab';
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
@@ -199,7 +196,7 @@ export function DateSheet({ step, moment, bounds, onClose, onPick }: Props) {
         {clockStep && (
           <>
             <Text style={styles.timeLabel}>ВРЕМЯ</Text>
-            <Wheel key={`${step}:${wheelKey}`} count={slots} initial={slot} slotMin={slotMin} onChange={setSlot} />
+            <TimeWheel key={`${step}:${wheelKey}`} count={slots} initial={slot} slotMin={slotMin} onChange={setSlot} item={ITEM} size={28} band={50} />
           </>
         )}
 
@@ -215,57 +212,6 @@ export function DateSheet({ step, moment, bounds, onClose, onPick }: Props) {
         </Pressable>
       </Animated.View>
     </Animated.View>
-  );
-}
-
-/** Колесо времени: 3 строки, выбранная — посередине на светлой плашке */
-function Wheel({ count, initial, slotMin, onChange }: { count: number; initial: number; slotMin: number; onChange: (i: number) => void }) {
-  const y = useSharedValue(initial * ITEM);
-  const last = useRef(initial);
-  const onScroll = useAnimatedScrollHandler((e) => {
-    y.value = e.contentOffset.y;
-  });
-  const settle = (off: number) => {
-    const i = Math.max(0, Math.min(count - 1, Math.round(off / ITEM)));
-    if (i !== last.current) {
-      last.current = i;
-      onChange(i);
-      Haptics.selectionAsync().catch(() => {});
-    }
-  };
-  return (
-    <View style={styles.wheel}>
-      <View style={styles.band} />
-      <Animated.ScrollView
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM}
-        decelerationRate="fast"
-        contentOffset={{ x: 0, y: initial * ITEM }}
-        contentContainerStyle={{ paddingVertical: ITEM }}
-        onMomentumScrollEnd={(e) => settle(e.nativeEvent.contentOffset.y)}
-        onScrollEndDrag={(e) => {
-          if (!e.nativeEvent.velocity || Math.abs(e.nativeEvent.velocity.y) < 0.05) settle(e.nativeEvent.contentOffset.y);
-        }}
-      >
-        {Array.from({ length: count }, (_, i) => (
-          <WheelItem key={i} i={i} y={y} label={`${pad(Math.floor((i * slotMin) / 60))} : ${pad((i * slotMin) % 60)}`} />
-        ))}
-      </Animated.ScrollView>
-    </View>
-  );
-}
-
-function WheelItem({ i, y, label }: { i: number; y: SharedValue<number>; label: string }) {
-  const style = useAnimatedStyle(() => {
-    const k = Math.min(1, Math.abs(y.value / ITEM - i)); // 0 — в центре, 1 — соседняя строка
-    return { opacity: 1 - 0.7 * k, transform: [{ scale: 1 - (8 / 28) * k }] };
-  });
-  return (
-    <View style={styles.item}>
-      <Animated.Text maxFontSizeMultiplier={1.3} style={[styles.itemText, style]}>{label}</Animated.Text>
-    </View>
   );
 }
 
