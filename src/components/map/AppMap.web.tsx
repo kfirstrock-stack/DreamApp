@@ -1,6 +1,8 @@
 // Заглушка карты для веба: react-native-maps здесь не импортируется.
+// Текст — компактная плашка сверху, чтобы его не перекрывали пины и кнопки «Где я».
 import { forwardRef, useImperativeHandle, useRef } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { D, F } from '@/lib/design';
 
@@ -37,6 +39,7 @@ type Props = {
 };
 
 const AppMap = forwardRef<AppMapHandle, Props>(function AppMap({ style, initialRegion, onRegionChange, onRegionChangeComplete }, ref) {
+  const insets = useSafeAreaInsets();
   const region = useRef<Region>(
     initialRegion ?? { latitude: 59.9341, longitude: 30.3061, latitudeDelta: 0.012, longitudeDelta: 0.012 },
   );
@@ -51,8 +54,11 @@ const AppMap = forwardRef<AppMapHandle, Props>(function AppMap({ style, initialR
 
   return (
     <View style={[styles.root, style]} accessibilityRole="summary">
-      <Text style={styles.title}>Карта на вебе пока недоступна</Text>
-      <Text style={styles.sub}>Откройте Glimika в Expo Go на телефоне — там карта работает.</Text>
+      {/* Под строкой поиска (~46 + 8), компактно и с непрозрачным фоном — читается поверх пинов */}
+      <View style={[styles.banner, { top: insets.top + 62 }]} pointerEvents="none">
+        <Text style={styles.title}>Карта на вебе пока недоступна</Text>
+        <Text style={styles.sub}>Откройте Glimika в Expo Go на телефоне.</Text>
+      </View>
     </View>
   );
 });
@@ -62,23 +68,30 @@ export default AppMap;
 const styles = StyleSheet.create({
   root: {
     backgroundColor: D.mapBase,
+  },
+  banner: {
+    position: 'absolute',
+    alignSelf: 'center',
+    maxWidth: 300,
+    marginHorizontal: 16,
+    backgroundColor: D.paper,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
   },
   title: {
     fontFamily: F.sansMedium,
-    fontSize: 16,
+    fontSize: 13,
     color: D.ink,
     textAlign: 'center',
   },
   sub: {
-    marginTop: 8,
+    marginTop: 2,
     fontFamily: F.sans,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 16,
     color: D.ink60,
     textAlign: 'center',
-    maxWidth: 280,
   },
 });

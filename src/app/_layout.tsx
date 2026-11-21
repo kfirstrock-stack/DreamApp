@@ -6,6 +6,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from '@/lib/auth';
 import { D } from '@/lib/design';
@@ -29,7 +30,9 @@ export default function RootLayout() {
     const t = setTimeout(() => hideSplash(), 4000);
     return () => clearTimeout(t);
   }, [error]);
-  if (!loaded && !error) return null;
+  if (!loaded && !error) {
+    return <View style={{ flex: 1, backgroundColor: D.night }} />;
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

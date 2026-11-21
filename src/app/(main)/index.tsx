@@ -28,7 +28,7 @@ import { TAB_BAR_SPACE, TabBar } from '@/components/ui/TabBar';
 import { useAuth } from '@/lib/auth';
 import { D, F, SHEET_SPRING, STEP_MIN, softShadow } from '@/lib/design';
 import { clearMapOrigin, consumeMapFocus, returnToMapOrigin, useMapOrigin } from '@/lib/focus';
-import { currentPosition } from '@/lib/location';
+import { currentPosition, locateAlert, requestCurrentPosition } from '@/lib/location';
 import { openPhotoFeed } from '@/lib/feed';
 import { hideSplash, isOnboarded } from '@/lib/onboarding';
 import { project, regionBounds, regionRadiusM, type MapRegion } from '@/lib/geo';
@@ -642,13 +642,11 @@ export default function MapScreen() {
 
   const locateMe = async () => {
     markUser();
-    const perm = await Location.requestForegroundPermissionsAsync();
-    if (!perm.granted) return Alert.alert('Нет доступа к геопозиции', 'Разрешите его в настройках телефона.');
-    // iPad без GPS или выключенные службы геолокации: getCurrentPositionAsync падает или висит
-    const pos = await currentPosition();
-    if (pos) flyTo(pos.coords.latitude, pos.coords.longitude, 0.008);
+    const res = await requestCurrentPosition();
+    if (res.ok) flyTo(res.coords.latitude, res.coords.longitude, 0.008);
     else {
-      Alert.alert('Не удалось определить место', 'Проверьте, что службы геолокации включены, и попробуйте ещё раз.');
+      const a = locateAlert(res.reason);
+      Alert.alert(a.title, a.message);
     }
   };
 
@@ -980,7 +978,7 @@ export default function MapScreen() {
       {stepMenu && (
         <>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setStepMenu(false)} accessibilityLabel="Закрыть меню" />
-          <Animated.View entering={FadeInDown.duration(180)} exiting={FadeOut.duration(120)} style={[styles.stepMenu, { bottom: sheetBottom + sheet.h + 10 }]}>
+          <Animated.View entering={FadeInDown.duration(180)} exiting={FadeOut.duration(120)} style={[styles.stepMenu, { top: (sheet.y || 0) + (mode === 'mini' ? 58 : 48) }]}>
             {STEPS.map((x) => (
               <Pressable key={x.key} onPress={() => changeStep(x.key)} style={({ pressed }) => [styles.stepRow, pressed && { backgroundColor: D.paper }]}>
                 <Text style={[styles.stepRowText, x.key === step && styles.stepRowOn]}>{x.menu}</Text>

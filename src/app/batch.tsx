@@ -22,7 +22,7 @@ const DAY_ROWS = 2; // строк дня до «+ ещё N за этот ден�
 const SPB = { lat: 59.9341, lng: 30.3061 };
 
 export default function BatchReview() {
-  const { session, profile } = useAuth();
+  const { session, profile, ready: authReady } = useAuth();
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<BatchItem[]>(() => takeBatch());
   const [priv, setPriv] = useState(true); // ревью 17.11: по умолчанию «Только мне», как на C7
@@ -34,8 +34,10 @@ export default function BatchReview() {
   const uploaded = useUploaded();
 
   useEffect(() => {
-    if (!items.length) router.back();
-  }, [items.length]);
+    if (!authReady) return;
+    if (!session) router.replace('/sign-in');
+    else if (!items.length) router.replace('/new');
+  }, [authReady, session, items.length]);
 
   // адреса строк — по одному запросу за раз
   const geocoded = useRef(new Set<string>());
@@ -62,7 +64,7 @@ export default function BatchReview() {
   const noPlace = items.filter((i) => i.lat == null).length;
   const noTime = items.filter((i) => !i.takenAt).length;
   const dups = items.filter((i) => uploaded.has(i.key)).length;
-  const ready = !noPlace && !noTime;
+  const ready = items.length > 0 && !noPlace && !noTime;
   const near = items.find((i) => i.lat != null) ?? null;
 
   // «+ Ещё снимки»: тот же системный выбор, сколько осталось до 50; повторно выбранные — пропускаем
@@ -84,6 +86,10 @@ export default function BatchReview() {
     startUpload(session.user.id, items, priv, author); // C2c: дальше — плашка на карте, «Смотреть» перелетит к снимкам
     router.dismissTo('/');
   };
+
+  if (!authReady || !session || !items.length) {
+    return <View style={{ flex: 1, backgroundColor: D.paper }} />;
+  }
 
   if (mapFor)
     return (

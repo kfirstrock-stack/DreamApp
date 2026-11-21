@@ -252,15 +252,15 @@ function Bottom({ progress, onNext }: { progress: P; onNext: () => void }) {
         </View>
       </Animated.View>
       <Animated.View style={[styles.morph, btn]}>
-        <Pressable onPress={onNext} style={({ pressed }) => [styles.morphPress, pressed && { opacity: 0.88 }]} accessibilityRole="button">
-          <View style={styles.morphCenter} pointerEvents="none">
+        <Pressable onPress={onNext} style={({ pressed }) => [styles.morphPress, pressed && { opacity: 0.88 }]} accessibilityRole="button" accessibilityLabel="Начать">
+          <View style={styles.morphCenter} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
             <View style={styles.word} onLayout={(e) => (word.value = { ...word.value, w: e.nativeEvent.layout.width })}>
               {WORD.map((ch, i) => (
                 <Letter key={i} ch={ch} i={i} progress={progress} word={word} />
               ))}
             </View>
           </View>
-          <Animated.View pointerEvents="none" style={[styles.morphCenter, arrow]}>
+          <Animated.View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden style={[styles.morphCenter, arrow]}>
             <Icon name="arrow" size={27.6} color={D.white} />
           </Animated.View>
         </Pressable>

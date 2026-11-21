@@ -10,7 +10,7 @@ import { Text } from '@/components/ui/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { D, F } from '@/lib/design';
 import type { Draft } from '@/lib/draft';
-import { currentPosition } from '@/lib/location';
+import { currentPosition, locateAlert, requestCurrentPosition } from '@/lib/location';
 import { reverseAddress } from '@/lib/places';
 
 const coords = (lat: number, lng: number) => `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? 'N' : 'S'}`;
@@ -52,12 +52,12 @@ export function PlacePicker({ draft, noGeo, onCancel, onPick }: { draft: Pick<Dr
       .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const locate = async () => {
-    const perm = await Location.requestForegroundPermissionsAsync().catch(() => null);
-    if (!perm?.granted) return Alert.alert('Нет доступа к геопозиции', 'Разрешите его в настройках телефона.');
-    // iPad без GPS / выключенные службы: не висим дольше 8 с (QA 17.11)
-    const pos = await currentPosition();
-    if (pos) map.current?.animateToRegion({ ...start, latitude: pos.coords.latitude, longitude: pos.coords.longitude }, 500);
-    else Alert.alert('Не удалось определить место', 'Проверьте, что службы геолокации включены, или передвиньте карту вручную.');
+    const res = await requestCurrentPosition();
+    if (res.ok) map.current?.animateToRegion({ ...start, latitude: res.coords.latitude, longitude: res.coords.longitude }, 500);
+    else {
+      const a = locateAlert(res.reason);
+      Alert.alert(a.title, a.message);
+    }
   };
   return (
     <View style={{ flex: 1, backgroundColor: D.mapBase }}>

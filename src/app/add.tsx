@@ -46,7 +46,7 @@ const isNetwork = (e: any) => {
 };
 
 export default function PublishScreen() {
-  const { session, profile } = useAuth();
+  const { session, profile, ready } = useAuth();
   const [draft, setD] = useState<Draft | null>(() => getDraft());
   // «Продолжить черновик» (C2): место, адрес и подпись — как были введены
   const [saved] = useState(() => takeDraftExtras());
@@ -63,8 +63,10 @@ export default function PublishScreen() {
   const found = useRef(draft ? draft.lat != null && draft.takenAt != null : false); // «Место и время найдены» — только если оба из снимка
 
   useEffect(() => {
-    if (!draft) router.back();
-  }, [draft]);
+    if (!ready) return;
+    if (!session) router.replace('/sign-in');
+    else if (!draft) router.replace('/new');
+  }, [ready, session, draft]);
   useEffect(() => {
     if (draft?.lat == null || draft.lng == null) return;
     let off = false;
@@ -77,7 +79,9 @@ export default function PublishScreen() {
       off = true;
     };
   }, [draft?.lat, draft?.lng]);
-  if (!draft) return null;
+  if (!ready || !session || !draft) {
+    return <View style={{ flex: 1, backgroundColor: D.paper }} />;
+  }
 
   const update = (patch: Partial<Draft>) => {
     const next = { ...draft, ...patch };

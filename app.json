@@ -28,7 +28,9 @@
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "lang": "ru",
+      "themeColor": "#0F0E0C"
     },
     "plugins": [
       "expo-router",
