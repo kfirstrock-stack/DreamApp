@@ -158,8 +158,8 @@ function Skip({ progress, active, onPress }: { progress: P; active: boolean; onP
   return (
     <Animated.View pointerEvents={active ? 'auto' : 'none'} style={[styles.skip, { top: insets.top + 11 }, wrap]}>
       <Pressable onPress={onPress} hitSlop={12}>
-        <Animated.Text allowFontScaling={false} style={[styles.skipText, { color: D.ink60 }, dark]}>Пропустить</Animated.Text>
-        <Animated.Text allowFontScaling={false} style={[styles.skipText, styles.skipOver, { color: 'rgba(244,239,230,0.8)' }, light]}>Пропустить</Animated.Text>
+        <Animated.Text maxFontSizeMultiplier={2} style={[styles.skipText, { color: D.ink60 }, dark]}>Пропустить</Animated.Text>
+        <Animated.Text maxFontSizeMultiplier={2} style={[styles.skipText, styles.skipOver, { color: 'rgba(244,239,230,0.8)' }, light]}>Пропустить</Animated.Text>
       </Pressable>
     </Animated.View>
   );
@@ -213,6 +213,15 @@ function Letter({ ch, i, progress, word }: { ch: string; i: number; progress: P;
 function Bottom({ progress, onNext }: { progress: P; onNext: () => void }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const [cta, setCta] = useState('Далее');
+  useAnimatedReaction(
+    () => progress.value,
+    (v) => {
+      const next = v >= LAST - 0.5 ? 'Начать' : 'Далее';
+      scheduleOnRN(setCta, next);
+    },
+    [progress],
+  );
   // Круглая стрелка на пути к A3 вытягивается влево в длинную кнопку «Начать» (как в макете A3)
   const word = useSharedValue<Word>({ w: 0, x: [], cw: [] });
   const dots = useAnimatedStyle(() => ({ opacity: interpolate(progress.value, [1, 1.35], [1, 0], Extrapolation.CLAMP) }));
@@ -252,7 +261,7 @@ function Bottom({ progress, onNext }: { progress: P; onNext: () => void }) {
         </View>
       </Animated.View>
       <Animated.View style={[styles.morph, btn]}>
-        <Pressable onPress={onNext} style={({ pressed }) => [styles.morphPress, pressed && { opacity: 0.88 }]} accessibilityRole="button" accessibilityLabel="Начать">
+        <Pressable onPress={onNext} style={({ pressed }) => [styles.morphPress, pressed && { opacity: 0.88 }]} accessibilityRole="button" accessibilityLabel={cta}>
           <View style={styles.morphCenter} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
             <View style={styles.word} onLayout={(e) => (word.value = { ...word.value, w: e.nativeEvent.layout.width })}>
               {WORD.map((ch, i) => (
@@ -394,7 +403,7 @@ const styles = StyleSheet.create({
   skipText: { fontFamily: F.sansMedium, fontSize: 15 },
   skipOver: { position: 'absolute', left: 0, top: 0 },
   textBlock: { position: 'absolute', left: 32, right: 32 },
-  step: { fontFamily: F.mono, fontSize: 12, lineHeight: 16, letterSpacing: 0.96, color: D.sun },
+  step: { fontFamily: F.mono, fontSize: 12, lineHeight: 16, letterSpacing: 0.96, color: D.ink60 },
   title: { marginTop: 10, fontFamily: F.serif, fontSize: 34, lineHeight: 40, color: D.ink },
   body: { marginTop: 12, maxWidth: 320, fontFamily: F.sans, fontSize: 16, lineHeight: 23, color: 'rgba(22,19,15,0.62)' },
   privacy: { marginTop: 18, flexDirection: 'row', alignItems: 'center', gap: 10 },

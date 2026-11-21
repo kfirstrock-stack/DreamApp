@@ -4,11 +4,13 @@
 // Шторки, фото и онбординг остаются в корневом (нативном) стеке со своими анимациями.
 import { Animated, Easing } from 'react-native';
 import { Stack, type StackCardInterpolationProps } from 'expo-router/js-stack';
+import { useReduceMotion } from '@/lib/a11y';
 import { D } from '@/lib/design';
 
 const EASE = Easing.bezier(0.76, 0, 0.24, 1);
 const OPEN = { animation: 'timing', config: { duration: 560, easing: EASE } } as const;
 const CLOSE = { animation: 'timing', config: { duration: 460, easing: EASE } } as const;
+const FADE = { animation: 'timing', config: { duration: 150, easing: Easing.linear } } as const;
 
 function slideParallax({ current, next, layouts, inverted }: StackCardInterpolationProps) {
   const W = layouts.screen.width;
@@ -28,17 +30,18 @@ function fade({ current }: StackCardInterpolationProps) {
 }
 
 export default function MainLayout() {
+  const reduce = useReduceMotion();
   return (
     <Stack
       screenOptions={{
         headerShown: false,
         cardStyle: { backgroundColor: D.paper },
         cardOverlayEnabled: true,
-        cardShadowEnabled: true,
+        cardShadowEnabled: !reduce,
         gestureEnabled: true,
         gestureDirection: 'horizontal',
-        transitionSpec: { open: OPEN, close: CLOSE },
-        cardStyleInterpolator: slideParallax,
+        transitionSpec: reduce ? { open: FADE, close: FADE } : { open: OPEN, close: CLOSE },
+        cardStyleInterpolator: reduce ? fade : slideParallax,
       }}
     >
       <Stack.Screen name="index" />

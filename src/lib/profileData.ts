@@ -59,7 +59,7 @@ export async function fetchMatches(): Promise<Match[]> {
   return sorted;
 }
 
-/** «Это не я — скрыть»: совпадение больше не показываем никогда */
+/** «Это не я — скрыть»: совпадение скрыто, пока его не вернут */
 /** «Это я» / отмена: отметка только для себя, автор её не видит */
 export async function setMatchConfirmed(uid: string, m: Match, on: boolean) {
   const q = supabase.from('match_confirmations');
@@ -76,6 +76,75 @@ export async function dismissMatch(uid: string, m: Match) {
   const { error } = await supabase.from('match_dismissals').insert({ user_id: uid, my_photo_id: m.my_photo_id, other_photo_id: m.other_photo_id });
   if (error && error.code !== '23505') throw error;
   lastMatches = lastMatches.filter((x) => matchKey(x) !== matchKey(m));
+}
+
+/** Вернуть скрытое совпадение: удаляем свою запись, оно снова попадёт в my_matches_v2 */
+export async function restoreMatch(uid: string, m: Pick<Match, 'my_photo_id' | 'other_photo_id'>) {
+  const { error } = await supabase
+    .from('match_dismissals')
+    .delete()
+    .eq('user_id', uid)
+    .eq('my_photo_id', m.my_photo_id)
+    .eq('other_photo_id', m.other_photo_id);
+  if (error) throw error;
+}
+
+function distanceM(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const dx = (bLng - aLng) * Math.cos((aLat * Math.PI) / 180) * 111320;
+  const dy = (bLat - aLat) * 110540;
+  return Math.hypot(dx, dy);
+}
+
+/** Скрытые совпадения текущего пользователя — для экрана в Настройках */
+export async function fetchHiddenMatches(uid: string): Promise<Match[]> {
+  const { data: rows, error } = await supabase
+    .from('match_dismissals')
+    .select('my_photo_id, other_photo_id, created_at')
+    .eq('user_id', uid)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  if (!rows?.length) return [];
+  const ids = [...new Set(rows.flatMap((r) => [r.my_photo_id, r.other_photo_id]))];
+  const { data: photos, error: pe } = await supabase
+    .from('photos')
+    .select('id,user_id,storage_path,taken_at,lat,lng,place_name')
+    .in('id', ids);
+  if (pe) throw pe;
+  const byId = new Map((photos ?? []).map((ph: any) => [ph.id, ph]));
+  const authorIds = [...new Set((photos ?? []).map((ph: any) => ph.user_id).filter((id: string) => id !== uid))];
+  const { data: profiles } = authorIds.length
+    ? await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id', authorIds)
+    : { data: [] as any[] };
+  const byUser = new Map((profiles ?? []).map((pr: any) => [pr.id, pr]));
+  const list: Match[] = [];
+  for (const r of rows) {
+    const mine = byId.get(r.my_photo_id);
+    const other = byId.get(r.other_photo_id);
+    if (!mine || !other) continue;
+    const author = byUser.get(other.user_id);
+    const myTime = new Date(mine.taken_at).getTime();
+    const otherTime = new Date(other.taken_at).getTime();
+    list.push({
+      my_photo_id: mine.id,
+      my_storage_path: mine.storage_path,
+      my_taken_at: mine.taken_at,
+      my_lat: mine.lat,
+      my_lng: mine.lng,
+      other_photo_id: other.id,
+      other_storage_path: other.storage_path,
+      other_taken_at: other.taken_at,
+      other_lat: other.lat,
+      other_lng: other.lng,
+      other_user_id: other.user_id,
+      other_username: author?.username ?? null,
+      other_name: author?.display_name ?? null,
+      other_avatar: author?.avatar_url ?? null,
+      place_name: other.place_name || mine.place_name,
+      distance_m: distanceM(mine.lat, mine.lng, other.lat, other.lng),
+      minutes_apart: Math.abs(otherTime - myTime) / 60000,
+    });
+  }
+  return list;
 }
 
 export async function fetchProfile(id: string): Promise<Profile | null> {

@@ -116,7 +116,7 @@ export default function ProfileEdit() {
               onFocus={() => setFocus('name')}
               onBlur={() => setFocus(null)}
               placeholder="Как к вам обращаться"
-              placeholderTextColor={D.ink40}
+              placeholderTextColor={D.ink60}
               selectionColor={D.sun}
               autoCapitalize="words"
               maxLength={60}
@@ -140,7 +140,7 @@ export default function ProfileEdit() {
               />
               {nickState === 'checking' && <ActivityIndicator size="small" color={D.ink40} />}
             </View>
-            {shownNickHint ? <Text style={[styles.hint, nickState === 'taken' && { color: D.sun }]}>{shownNickHint}</Text> : null}
+            {shownNickHint ? <Text style={[styles.hint, nickState === 'taken' && { color: D.error }]}>{shownNickHint}</Text> : null}
           </View>
           {/* город — по желанию, виден в D3 рядом с ником (утверждено 12.10) */}
           <View style={styles.group}>
@@ -151,7 +151,7 @@ export default function ProfileEdit() {
               onFocus={() => setFocus('city')}
               onBlur={() => setFocus(null)}
               placeholder="Где вы чаще всего снимаете"
-              placeholderTextColor={D.ink40}
+              placeholderTextColor={D.ink60}
               selectionColor={D.sun}
               autoCapitalize="words"
               textContentType="addressCity"
@@ -167,7 +167,7 @@ export default function ProfileEdit() {
               onFocus={() => setFocus('bio')}
               onBlur={() => setFocus(null)}
               placeholder="Пара слов о себе — по желанию"
-              placeholderTextColor={D.ink40}
+              placeholderTextColor={D.ink60}
               selectionColor={D.sun}
               multiline
               maxLength={160}
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   avatarEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: D.sun },
   avatarLetter: { fontFamily: F.serif, fontSize: 44, color: D.white },
   cam: { position: 'absolute', left: 69.5, top: 70, width: 36, height: 36, borderRadius: 18, backgroundColor: D.sunBtn, alignItems: 'center', justifyContent: 'center' },
-  change: { marginTop: 12, fontFamily: F.sansSemi, fontSize: 14, color: D.sun },
+  change: { marginTop: 12, fontFamily: F.sansSemi, fontSize: 14, color: D.ink, textDecorationLine: 'underline' },
   fields: { paddingHorizontal: 24, marginTop: 26, gap: 18 },
   group: { gap: 8 },
   label: { fontFamily: F.mono, fontSize: 11, letterSpacing: 0.66, color: D.ink60 },

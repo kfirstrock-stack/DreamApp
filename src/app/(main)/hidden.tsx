@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   sep: { height: 1, marginHorizontal: 8, backgroundColor: D.line },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 16, paddingRight: 14, paddingVertical: 12 },
   ava: { width: 40, height: 40, borderRadius: 20, backgroundColor: D.paper2 },
-  avaEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: D.sun },
+  avaEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: D.sunBtn },
   avaLetter: { fontFamily: F.sansSemi, fontSize: 16, color: D.white },
   name: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink },
   nick: { fontFamily: F.sans, fontSize: 13, color: D.ink60 },

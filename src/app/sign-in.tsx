@@ -138,7 +138,7 @@ function Polaroid({ shot, slot, s }: { shot: LastShot; slot: Slot; s: number }) 
       ]}
     >
       <Image source={photoSource(shot.path)} style={{ width: '100%', height: (slot.h - 38) * s, borderRadius: 2 * s, backgroundColor: D.paper2 }} contentFit="cover" />
-      <Text style={[styles.polaroidCap, { marginTop: 8 * s, fontSize: 9 * s, letterSpacing: 0.36 * s }]} numberOfLines={1}>
+      <Text style={[styles.polaroidCap, { marginTop: 8 * s, fontSize: Math.max(11, 9 * s), letterSpacing: 0.36 * s }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
         {shotCaption(shot.taken_at)}
       </Text>
     </View>
@@ -280,7 +280,7 @@ function EmailStep({ email, setEmail, busy, error, onSend, enter, returning, onO
         <Animated.View style={[at(176, 338, 0, 0), { overflow: 'visible' }, eTag]}>
           <View style={[styles.placeTag, { transform: [{ scale: s }] }]}>
             <Icon name="pin" size={14} color={D.white} />
-            <Text style={styles.placeTagText}>Исаакиевская пл.</Text>
+            <Text style={styles.placeTagText} numberOfLines={1}>Исаакиевская пл.</Text>
           </View>
         </Animated.View>
       )}
@@ -394,8 +394,11 @@ function CodeStep({ email, onBack, onResend }: { email: string; onBack: () => vo
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [wrong, setWrong] = useState(false);
+  const [otpError, setOtpError] = useState<'wrong' | 'network' | 'rate' | null>(null);
+  const [lockLeft, setLockLeft] = useState(0);
   const [left, setLeft] = useState(RESEND);
   const input = useRef<TextInputInstance>(null);
+  const clearNext = useRef(false);
   const cell = (width - 64 - 6 * (CODE - 1)) / CODE;
 
   useEffect(() => {
@@ -403,13 +406,41 @@ function CodeStep({ email, onBack, onResend }: { email: string; onBack: () => vo
     const t = setTimeout(() => setLeft((l) => l - 1), 1000);
     return () => clearTimeout(t);
   }, [left]);
+  useEffect(() => {
+    if (lockLeft <= 0) return;
+    const t = setTimeout(() => setLockLeft((l) => l - 1), 1000);
+    return () => clearTimeout(t);
+  }, [lockLeft]);
+
+  const classifyOtp = (error: { message?: string; status?: number; name?: string } | null) => {
+    const msg = (error?.message ?? '').toLowerCase();
+    const status = error?.status;
+    if (status === 429 || msg.includes('too many') || msg.includes('rate limit')) return 'rate' as const;
+    const offline = typeof navigator !== 'undefined' && navigator && 'onLine' in navigator && navigator.onLine === false;
+    if (
+      offline
+      || status === 0
+      || error?.name === 'AuthRetryableFetchError'
+      || msg.includes('network')
+      || msg.includes('fetch')
+      || msg.includes('internet')
+      || msg.includes('failed to')
+    ) return 'network' as const;
+    return 'wrong' as const;
+  };
 
   const verify = async (c: string) => {
+    if (lockLeft > 0) return;
     setBusy(true);
+    setOtpError(null);
     const { data, error } = await supabase.auth.verifyOtp({ email, token: c, type: 'email' });
     if (error || !data.user) {
       setBusy(false);
-      setWrong(true);
+      const kind = classifyOtp(error);
+      setOtpError(kind);
+      setWrong(kind === 'wrong');
+      clearNext.current = true;
+      if (kind === 'rate') setLockLeft(Math.max(left, 60));
       return;
     }
     const { data: p } = await supabase.from('profiles').select('username').eq('id', data.user.id).maybeSingle();
@@ -420,10 +451,17 @@ function CodeStep({ email, onBack, onResend }: { email: string; onBack: () => vo
   };
 
   const change = (t: string) => {
-    const c = t.replace(/\D/g, '').slice(0, CODE);
+    let c = t.replace(/\D/g, '').slice(0, CODE);
+    if (clearNext.current) {
+      const prev = code;
+      if (c.startsWith(prev) && c.length > prev.length) c = c.slice(prev.length);
+      else if (c === prev) c = '';
+      clearNext.current = false;
+      setWrong(false);
+      if (otpError === 'wrong') setOtpError(null);
+    }
     setCode(c);
-    setWrong(false);
-    if (c.length === CODE) verify(c); // автопроверка после всех цифр
+    if (c.length === CODE) verify(c);
   };
 
   return (
@@ -438,13 +476,16 @@ function CodeStep({ email, onBack, onResend }: { email: string; onBack: () => vo
           <Text style={styles.a5Sub}>
             Отправили {CODE} цифр на {email}
           </Text>
+          <Pressable onPress={onBack} hitSlop={8} style={styles.changeMail} accessibilityRole="button" accessibilityLabel="Изменить почту">
+            <Text style={styles.changeMailText}>Изменить почту</Text>
+          </Pressable>
           <View style={styles.cellsWrap}>
           <View style={styles.cells} pointerEvents="none">
             {Array.from({ length: CODE }, (_, i) => {
               const active = !busy && i === code.length;
               return (
                 <View key={i} style={[styles.cell, { width: cell }, (active || wrong) && styles.cellOn]}>
-                  {code[i] ? <Text style={styles.cellText}>{code[i]}</Text> : active ? <View style={styles.caret} /> : null}
+                  {code[i] ? <Text style={styles.cellText} maxFontSizeMultiplier={1.3}>{code[i]}</Text> : active ? <View style={styles.caret} /> : null}
                 </View>
               );
             })}
@@ -461,10 +502,24 @@ function CodeStep({ email, onBack, onResend }: { email: string; onBack: () => vo
             maxLength={CODE}
             caretHidden
             contextMenuHidden={false}
+            accessibilityLabel="Код из письма, 6 цифр"
+            accessibilityValue={{ text: code ? `${code.length} из ${CODE}` : 'пусто' }}
             style={styles.overlay}
+            maxFontSizeMultiplier={1.3}
           />
           </View>
-          {wrong ? <Text style={styles.wrong}>Код не подошёл. Проверьте его или запросите новый.</Text> : null}
+          {otpError === 'wrong' ? <Text style={styles.wrong}>Неверный код. Проверьте последнее письмо.</Text> : null}
+          {otpError === 'network' ? (
+            <View style={styles.netBox}>
+              <Text style={styles.wrong}>Нет соединения.</Text>
+              <Pressable onPress={() => code.length === CODE && verify(code)} hitSlop={8} style={styles.retry} accessibilityRole="button" accessibilityLabel="Повторить проверку кода">
+                <Text style={styles.retryText}>Повторить</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {otpError === 'rate' || lockLeft > 0 ? (
+            <Text style={styles.wrong}>Слишком много попыток — новый код через {Math.floor(lockLeft / 60)}:{String(lockLeft % 60).padStart(2, '0')}</Text>
+          ) : null}
           {left > 0 ? (
             <Text style={styles.resend}>Отправить ещё раз через 0:{String(left).padStart(2, '0')}</Text>
           ) : (
@@ -483,7 +538,7 @@ function CodeStep({ email, onBack, onResend }: { email: string; onBack: () => vo
           <View style={{ flex: 1 }} />
           <Pressable
             onPress={() => code.length === CODE && verify(code)}
-            disabled={busy || code.length < CODE}
+            disabled={busy || code.length < CODE || lockLeft > 0}
             style={[styles.button, { marginBottom: 16 }, code.length < CODE && { backgroundColor: 'rgba(255,90,54,0.35)' }]}
           >
             {busy ? <ActivityIndicator color={D.white} /> : <Text style={styles.buttonText}>Войти</Text>}
@@ -511,7 +566,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: D.sunBtn,
   },
-  placeTagText: { fontFamily: F.sansSemi, fontSize: 12, color: D.white },
+  placeTagText: { fontFamily: F.sansSemi, fontSize: 12, color: D.white, flexShrink: 1, maxWidth: 200 },
   placeTagReal: {
     transformOrigin: 'center top',
     maxWidth: 300,
@@ -556,7 +611,7 @@ const styles = StyleSheet.create({
   guest: { fontFamily: F.sansSemi, fontSize: 15, color: 'rgba(244,239,230,0.7)' },
   // A4 · с возвращением
   acctAva: { width: 32, height: 32, borderRadius: 16, backgroundColor: D.night3, marginLeft: -4 },
-  acctIni: { backgroundColor: D.sun, alignItems: 'center', justifyContent: 'center' },
+  acctIni: { backgroundColor: D.sunBtn, alignItems: 'center', justifyContent: 'center' },
   acctIniText: { fontFamily: F.sansSemi, fontSize: 14, color: D.white },
   acctEmail: { flex: 1, fontFamily: F.sans, fontSize: 16, color: D.paper },
   links: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 28, marginTop: 32 - 13 },
@@ -564,14 +619,19 @@ const styles = StyleSheet.create({
   backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(244,239,230,0.1)', alignItems: 'center', justifyContent: 'center' },
   a5Title: { marginTop: 24, fontFamily: F.serif, fontSize: 36, lineHeight: 48, color: D.paper },
   a5Sub: { marginTop: 6, maxWidth: 300, fontFamily: F.sans, fontSize: 16, lineHeight: 23, color: 'rgba(244,239,230,0.6)' },
+  changeMail: { alignSelf: 'flex-start', marginTop: 4, minHeight: 44, justifyContent: 'center' },
+  changeMailText: { fontFamily: F.sansSemi, fontSize: 15, color: D.paper, textDecorationLine: 'underline' },
   cells: { marginTop: 22, flexDirection: 'row', gap: 6 },
-  cell: { height: 60, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(244,239,230,0.14)', backgroundColor: 'rgba(244,239,230,0.07)', alignItems: 'center', justifyContent: 'center' },
+  cell: { minHeight: 60, height: 60, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(244,239,230,0.14)', backgroundColor: 'rgba(244,239,230,0.07)', alignItems: 'center', justifyContent: 'center' },
   cellOn: { borderWidth: 2, borderColor: D.sun },
-  cellText: { fontFamily: F.mono, fontSize: 26, color: D.paper },
+  cellText: { fontFamily: F.mono, fontSize: 26, color: D.paper }, // герой-цифры: в JSX maxFontSizeMultiplier 1.3
   caret: { width: 2, height: 26, borderRadius: 1, backgroundColor: D.sun },
   cellsWrap: { position: 'relative' },
   // поле поверх клеток: на iPad скрытое поле 1×1 не получает фокус
   overlay: { position: 'absolute', left: 0, right: 0, top: 22, height: 60, color: 'transparent', backgroundColor: 'transparent', opacity: 0.02, fontSize: 1 },
-  wrong: { marginTop: 16, fontFamily: F.sans, fontSize: 14, color: D.sun },
+  wrong: { marginTop: 16, fontFamily: F.sans, fontSize: 14, color: D.errorOnDark },
+  netBox: { marginTop: 16, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12 },
+  retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
+  retryText: { fontFamily: F.sansSemi, fontSize: 15, color: D.paper, textDecorationLine: 'underline' },
   resend: { marginTop: 20, fontFamily: F.sans, fontSize: 14, color: 'rgba(244,239,230,0.5)' },
 });

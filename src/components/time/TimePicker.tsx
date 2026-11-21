@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: D.sunSoft,
   },
-  noTimeText: { fontFamily: F.sansMedium, fontSize: 13, lineHeight: 17, color: D.sun },
+  noTimeText: { fontFamily: F.sansMedium, fontSize: 13, lineHeight: 17, color: D.ink },
   timeSheet: {
     backgroundColor: D.white,
     borderTopLeftRadius: 28,

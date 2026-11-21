@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -55,6 +55,26 @@ const Bar = memo(function Bar({ i, h, w, x, off }: { i: number; h: number; w: nu
   return <Animated.View style={[styles.bar, { height: h, width: w, borderRadius: Math.min(2, w / 2) }, style]} />;
 });
 
+function Tick({ i, label, x, off, center, innerW }: { i: number; label: string; x: SharedValue<number>; off: SharedValue<number>; center: number; innerW: number }) {
+  const style = useAnimatedStyle(() => {
+    const pos = center - ITEM / 2 - x.value - off.value * ITEM + i * ITEM + ITEM / 2;
+    const fits = pos - 20 >= 0 && pos + 20 <= innerW;
+    return { left: i * ITEM + ITEM / 2 - 20, opacity: fits ? 1 : 0 };
+  });
+  return (
+    <Animated.Text maxFontSizeMultiplier={1.3} style={[styles.tick, style]}>
+      {label}
+    </Animated.Text>
+  );
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
+const hmRange = (i: number) => {
+  const start = ((i * STEP_MIN) % 1440 + 1440) % 1440;
+  const end = (start + STEP_MIN) % 1440;
+  return `${pad(Math.floor(start / 60))}:${pad(start % 60)}–${pad(Math.floor(end / 60))}:${pad(end % 60)}`;
+};
+
 // Шкала-гистограмма суток: едет за пальцем, после броска докатывается по инерции,
 // тап по гистограмме — переход к моменту, щелчок вибрацией на каждом шаге.
 export const TimeScrubber = memo(function TimeScrubber({
@@ -86,9 +106,21 @@ export const TimeScrubber = memo(function TimeScrubber({
   const userRef = useRef(onUserTouch);
   userRef.current = onUserTouch;
   const touched = () => userRef.current?.();
+  const [a11yText, setA11yText] = useState(() => `${hmRange(initialIndex)}, ${counts[initialIndex + offset] ?? 0} фото`);
+  const describe = (i: number) => {
+    const photos = counts[i + offset] ?? 0;
+    setA11yText(`${hmRange(i)}, ${photos} фото`);
+  };
   const tick = (i: number, quiet: boolean) => {
     if (!quiet) Haptics.selectionAsync().catch(() => {});
     onIndexChange(i);
+    describe(i);
+  };
+  const moveBy = (d: number) => {
+    touched();
+    const next = Math.round(x.value / ITEM) + d;
+    const clamped = Math.min(maxX / ITEM, Math.max(minX / ITEM, next));
+    x.value = withSpring(clamped * ITEM, { damping: 26, stiffness: 180, mass: 0.8 });
   };
 
   // смена диапазона: новый offset и сдвиг x — одним кадром, чтобы картинка не дёрнулась
@@ -198,7 +230,18 @@ export const TimeScrubber = memo(function TimeScrubber({
 
   return (
     <GestureDetector gesture={gesture}>
-      <View collapsable={false}>
+      <View
+        collapsable={false}
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel="Шкала времени"
+        accessibilityValue={{ text: a11yText }}
+        accessibilityActions={[{ name: 'increment', label: 'Позже' }, { name: 'decrement', label: 'Раньше' }]}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === 'increment') moveBy(1);
+          if (e.nativeEvent.actionName === 'decrement') moveBy(-1);
+        }}
+      >
         {header}
         <View style={[styles.wrap, { height: compact ? H + 10 : H + 28 }]} onLayout={(e) => (barsTop.value = e.nativeEvent.layout.y)}>
           {/* T2 · «окно интервала»: мягкая капсула под выбранным столбиком, на всю высоту шкалы */}
@@ -213,9 +256,7 @@ export const TimeScrubber = memo(function TimeScrubber({
             </View>
             {!compact && <View style={styles.ticks}>
               {(ticks ?? Array.from({ length: 13 }, (_, k) => ({ i: k * 8, label: `${String(k * 2).padStart(2, '0')}:00` }))).map((t) => (
-                <Text key={t.i} style={[styles.tick, { left: t.i * ITEM + ITEM / 2 - 20 }]}>
-                  {t.label}
-                </Text>
+                <Tick key={t.i} i={t.i} label={t.label} x={x} off={off} center={center} innerW={innerW} />
               ))}
             </View>}
           </Animated.View>
@@ -235,5 +276,5 @@ const styles = StyleSheet.create({
   slot: { width: ITEM, alignItems: 'center', justifyContent: 'flex-end' },
   bar: { transformOrigin: 'bottom' },
   ticks: { height: 20, marginTop: 6 },
-  tick: { position: 'absolute', width: 40, textAlign: 'center', fontFamily: F.mono, fontSize: 10, color: D.ink40 },
+  tick: { position: 'absolute', width: 40, textAlign: 'center', fontFamily: F.mono, fontSize: 12, color: D.ink60 },
 });

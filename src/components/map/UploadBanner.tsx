@@ -170,5 +170,5 @@ const styles = StyleSheet.create({
   toast: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   toastIc: { width: 28, height: 28, borderRadius: 14, backgroundColor: D.sun, alignItems: 'center', justifyContent: 'center' },
   see: { height: 44, justifyContent: 'center', paddingLeft: 8 },
-  seeText: { fontFamily: F.sansSemi, fontSize: 14, color: D.sun },
+  seeText: { fontFamily: F.sansSemi, fontSize: 14, color: D.ink },
 });

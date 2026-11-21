@@ -192,7 +192,7 @@ export default function ProfileScreen() {
 function Stat({ n, label, accent }: { n: number; label: string; accent?: boolean }) {
   return (
     <View style={styles.stat}>
-      <Text style={[styles.statN, accent && { color: D.sun }]} numberOfLines={1} adjustsFontSizeToFit>
+      <Text style={[styles.statN, accent && { color: D.ink }]} numberOfLines={1} adjustsFontSizeToFit>
         {compact(n)}
       </Text>
       <Text style={styles.statL} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, paddingHorizontal: 16 },
   head: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 4 },
   avatar: { width: 84, height: 84, borderRadius: 42, borderWidth: 3, borderColor: D.white, backgroundColor: D.paper2 },
-  avatarEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: D.sun },
+  avatarEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: D.sunBtn },
   avatarLetter: { fontFamily: F.serif, fontSize: 36, color: D.white },
   name: { fontFamily: F.serif, fontSize: 32, color: D.ink },
   nick: { marginTop: 2, marginLeft: 2, fontFamily: F.mono, fontSize: 11, letterSpacing: 0.66, color: D.ink60 },
@@ -248,20 +248,20 @@ const styles = StyleSheet.create({
   mini: { position: 'absolute', width: 64, height: 64, borderRadius: 10, borderWidth: 3, borderColor: D.paper, overflow: 'hidden', backgroundColor: D.night3 },
   miniImg: { width: '100%', height: '100%' },
   cardTitle: { position: 'absolute', left: 132, top: 20, right: 14, fontFamily: F.sansSemi, fontSize: 15, lineHeight: 20, color: D.paper },
-  cardMeta: { position: 'absolute', left: 132, top: 62, right: 14, fontFamily: F.monoRegular, fontSize: 10, letterSpacing: 0.4, color: 'rgba(244,239,230,0.55)' },
+  cardMeta: { position: 'absolute', left: 132, top: 62, right: 14, fontFamily: F.monoRegular, fontSize: 11, letterSpacing: 0.4, color: 'rgba(244,239,230,0.55)' },
   cardBtn: { position: 'absolute', left: 132, top: 84, backgroundColor: D.sunBtn, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
   cardBtnText: { fontFamily: F.sansSemi, fontSize: 13, color: D.white },
   empty: { marginTop: 9, marginHorizontal: 20, backgroundColor: D.white, borderRadius: 24, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 20, gap: 6 },
   emptyTitle: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink },
   emptyText: { fontFamily: F.sans, fontSize: 13, lineHeight: 18, color: D.ink60 },
   momentsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, paddingRight: 23 },
-  link: { fontFamily: F.sansSemi, fontSize: 13, color: D.sun },
+  link: { fontFamily: F.sansSemi, fontSize: 13, color: D.ink },
   lock: { position: 'absolute', left: 6, top: 6, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(15,14,12,0.55)', alignItems: 'center', justifyContent: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, marginTop: 9 },
   moment: { borderRadius: 14, overflow: 'hidden', backgroundColor: D.paper2 },
   year: { position: 'absolute', left: 6, bottom: 6, backgroundColor: 'rgba(15,14,12,0.5)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
-  yearText: { fontFamily: F.mono, fontSize: 10, color: D.white },
-  first: { borderRadius: 14, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#9E9485', backgroundColor: '#E2D9C9', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  yearText: { fontFamily: F.mono, fontSize: 11, color: D.white },
+  first: { borderRadius: 14, borderWidth: 1.5, borderStyle: 'dashed', borderColor: D.ink60, backgroundColor: D.paper2, alignItems: 'center', justifyContent: 'center', gap: 4 },
   firstPlus: { fontFamily: F.sans, fontSize: 30, lineHeight: 34, color: D.ink },
   firstText: { fontFamily: F.sansSemi, fontSize: 12, color: D.ink },
   fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 120, experimental_backgroundImage: 'linear-gradient(180deg, rgba(244,239,230,0) 0%, #F4EFE6 100%)' },

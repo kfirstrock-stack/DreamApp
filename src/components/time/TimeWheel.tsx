@@ -31,8 +31,22 @@ export function TimeWheel({ count, initial, slotMin, onChange, item = 37, size =
       Haptics.selectionAsync().catch(() => {});
     }
   };
+  const cur = `${pad(Math.floor((last.current * slotMin) / 60))}:${pad((last.current * slotMin) % 60)}`;
   return (
-    <View style={{ height: item * 3 }}>
+    <View
+      style={{ height: item * 3 }}
+      accessible
+      accessibilityRole="adjustable"
+      accessibilityLabel="Время"
+      accessibilityValue={{ text: cur }}
+      accessibilityActions={[{ name: 'increment', label: 'Позже' }, { name: 'decrement', label: 'Раньше' }]}
+      onAccessibilityAction={(e) => {
+        const name = e.nativeEvent.actionName;
+        if (name !== 'increment' && name !== 'decrement') return;
+        const next = Math.max(0, Math.min(count - 1, last.current + (name === 'increment' ? 1 : -1)));
+        settle(next * item);
+      }}
+    >
       <View style={[styles.band, { top: item * 1.5 - band / 2, height: band }]} />
       <Animated.ScrollView
         onScroll={onScroll}
@@ -62,7 +76,7 @@ function Row({ i, y, item, size, label }: { i: number; y: SharedValue<number>; i
   });
   return (
     <View style={{ height: item, alignItems: 'center', justifyContent: 'center' }}>
-      <Animated.Text allowFontScaling={false} style={[{ fontFamily: F.mono, fontSize: size, color: D.ink }, style]}>{label}</Animated.Text>
+      <Animated.Text maxFontSizeMultiplier={1.3} style={[{ fontFamily: F.mono, fontSize: size, color: D.ink }, style]}>{label}</Animated.Text>
     </View>
   );
 }

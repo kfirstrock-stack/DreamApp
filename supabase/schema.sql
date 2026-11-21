@@ -428,6 +428,7 @@ create policy "own confirmations: read" on public.match_confirmations as PERMISS
 create policy "own confirmations: remove" on public.match_confirmations as PERMISSIVE for DELETE to authenticated using ((( SELECT auth.uid() AS uid) = user_id));
 create policy "users dismiss matches" on public.match_dismissals as PERMISSIVE for INSERT to authenticated with check ((( SELECT auth.uid() AS uid) = user_id));
 create policy "users see own dismissals" on public.match_dismissals as PERMISSIVE for SELECT to authenticated using ((( SELECT auth.uid() AS uid) = user_id));
+create policy "users restore dismissed matches" on public.match_dismissals as PERMISSIVE for DELETE to authenticated using ((( SELECT auth.uid() AS uid) = user_id));
 create policy "photos are public unless private" on public.photos as PERMISSIVE for SELECT to public using (((NOT private) OR (( SELECT auth.uid() AS uid) = user_id)));
 create policy "users delete own photos" on public.photos as PERMISSIVE for DELETE to authenticated using ((( SELECT auth.uid() AS uid) = user_id));
 create policy "users insert own photos" on public.photos as PERMISSIVE for INSERT to authenticated with check ((( SELECT auth.uid() AS uid) = user_id));

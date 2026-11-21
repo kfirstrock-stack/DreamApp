@@ -1,5 +1,7 @@
 // D5 · Настройки (с «Разрешениями» → системные настройки) и D6 · Удаление аккаунта (диалог поверх). «Скрытые авторы» → D9, правила/конфиденциальность → D7/D8
 import Constants from 'expo-constants';
+import * as Location from 'expo-location';
+import { getPermissionsAsync as getPhotos } from 'expo-media-library';
 import { router, useFocusEffect } from 'expo-router';
 import { type ReactNode, useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -12,7 +14,7 @@ import { Stagger } from '@/components/ui/Stagger';
 import { useAuth } from '@/lib/auth';
 import { D, F } from '@/lib/design';
 import { forgetLastUser } from '@/lib/lastUser';
-import { deleteAccount, fetchHiddenAuthors, fetchMatchesEnabled, fetchStats, setMatchesEnabled } from '@/lib/profileData';
+import { deleteAccount, fetchHiddenAuthors, fetchHiddenMatches, fetchMatchesEnabled, fetchStats, setMatchesEnabled } from '@/lib/profileData';
 import { supabase } from '@/lib/supabase';
 
 export default function SettingsScreen() {
@@ -21,6 +23,8 @@ export default function SettingsScreen() {
   const uid = session?.user.id;
   const [matchesOn, setMatchesOn] = useState(true);
   const [hidden, setHidden] = useState<number | null>(null);
+  const [hiddenMatches, setHiddenMatches] = useState<number | null>(null);
+  const [permValue, setPermValue] = useState('');
   const [photos, setPhotos] = useState(0);
   const [confirm, setConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -30,7 +34,17 @@ export default function SettingsScreen() {
       if (!uid) return;
       fetchMatchesEnabled(uid).then(setMatchesOn).catch(() => {});
       fetchHiddenAuthors(uid).then((l) => setHidden(l.length)).catch(() => {});
+      fetchHiddenMatches(uid).then((l) => setHiddenMatches(l.length)).catch(() => {});
       fetchStats(uid).then((s) => setPhotos(s.moments)).catch(() => {});
+      Promise.all([
+        Location.getForegroundPermissionsAsync().catch(() => ({ granted: false })),
+        getPhotos().catch(() => ({ granted: false })),
+      ]).then(([geo, photo]) => {
+        const parts: string[] = [];
+        if (photo.granted) parts.push('фото');
+        if (geo.granted) parts.push('место');
+        setPermValue(parts.length ? parts.join(', ') : 'не выданы');
+      });
     }, [uid]),
   );
 
@@ -88,8 +102,10 @@ export default function SettingsScreen() {
             <Sep />
             <Row title="Скрытые авторы" value={hidden != null ? String(hidden) : ''} chevron onPress={() => router.push('/hidden')} />
             <Sep />
+            <Row title="Скрытые совпадения" value={hiddenMatches != null ? String(hiddenMatches) : ''} chevron onPress={() => router.push('/hidden-matches')} />
+            <Sep />
             {/* 12.10: разрешения меняются только в настройках iPhone — открываем страницу DreamApp там */}
-            <Row title="Разрешения" value="Камера, фото, место" chevron onPress={() => Linking.openSettings().catch(() => {})} />
+            <Row title="Разрешения" value={permValue} chevron onPress={() => Linking.openSettings().catch(() => {})} />
           </View>
           </Stagger>
 
@@ -115,11 +131,11 @@ export default function SettingsScreen() {
       </ScrollView>
 
       {confirm && (
-        <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(160)} style={styles.dim}>
+        <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(160)} style={styles.dim} accessibilityViewIsModal accessibilityRole="alert">
           <Pressable style={StyleSheet.absoluteFill} onPress={() => !deleting && setConfirm(false)} />
           <Animated.View entering={ZoomIn.springify().damping(18).stiffness(220)} style={styles.dialog}>
             <View style={styles.ic}>
-              <Icon name="alert" size={26} color={D.sun} />
+              <Icon name="alert" size={26} color={D.error} />
             </View>
             <Text style={styles.dTitle}>Удалить аккаунт?</Text>
             <Text style={styles.dText}>
@@ -150,7 +166,7 @@ function Row({ title, value, chevron, danger, right, onPress, role, checked }: {
       accessibilityState={role ? { checked } : undefined}
       style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}
     >
-      <Text style={[styles.rowTitle, danger && { color: D.sun }]} numberOfLines={1}>
+      <Text style={[styles.rowTitle, danger && { color: D.error }]} numberOfLines={1}>
         {title}
       </Text>
       <View style={{ flex: 1 }} />
@@ -160,7 +176,7 @@ function Row({ title, value, chevron, danger, right, onPress, role, checked }: {
         </Text>
       ) : null}
       {right}
-      {chevron && <Icon name="chevR" size={18} color={D.ink40} />}
+      {chevron && <Icon name="chevR" size={18} color={D.ink60} />}
     </Pressable>
   );
 }
@@ -169,7 +185,7 @@ const Sep = () => <View style={styles.sep} />;
 
 function Toggle({ on }: { on: boolean }) {
   return (
-    <View style={[styles.toggle, { backgroundColor: on ? D.sun : D.line }]}>
+    <View style={[styles.toggle, on ? styles.toggleOn : styles.toggleOff]}>
       <View style={[styles.knob, { left: on ? 22 : 2 }]} />
     </View>
   );
@@ -185,11 +201,13 @@ const styles = StyleSheet.create({
   card: { backgroundColor: D.white, borderRadius: 20 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 16, paddingRight: 14, paddingVertical: 15, minHeight: 50 },
   rowTitle: { fontFamily: F.sans, fontSize: 16, color: D.ink, flexShrink: 0 },
-  rowValue: { flexShrink: 1, maxWidth: 170, fontFamily: F.sans, fontSize: 15, color: D.ink40 },
+  rowValue: { flexShrink: 1, maxWidth: 170, fontFamily: F.sans, fontSize: 15, color: D.ink60 },
   sep: { height: 1, marginHorizontal: 8, backgroundColor: D.line },
-  toggle: { width: 48, height: 28, borderRadius: 14 },
+  toggle: { width: 48, height: 28, borderRadius: 14, borderWidth: 1.5 },
+  toggleOn: { backgroundColor: D.sun, borderColor: D.sun },
+  toggleOff: { backgroundColor: D.white, borderColor: D.ink60 },
   knob: { position: 'absolute', top: 2, width: 24, height: 24, borderRadius: 12, backgroundColor: D.white },
-  version: { marginLeft: 24, fontFamily: F.monoRegular, fontSize: 11, color: D.ink40 },
+  version: { marginLeft: 24, fontFamily: F.monoRegular, fontSize: 11, color: D.ink60 },
   dim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,14,12,0.5)', justifyContent: 'center', paddingHorizontal: 24 },
   dialog: {
     backgroundColor: D.white,
@@ -205,7 +223,7 @@ const styles = StyleSheet.create({
   ic: { width: 52, height: 52, borderRadius: 26, backgroundColor: D.sunSoft, alignItems: 'center', justifyContent: 'center' },
   dTitle: { marginTop: 16, fontFamily: F.serif, fontSize: 26, color: D.ink },
   dText: { marginTop: 8, fontFamily: F.sans, fontSize: 15, lineHeight: 22, color: D.ink60 },
-  dButton: { marginTop: 18, backgroundColor: D.sunBtn, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
+  dButton: { marginTop: 18, backgroundColor: D.error, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
   dButtonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
   cancel: { alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13 },
   cancelText: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink60 },

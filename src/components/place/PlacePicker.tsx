@@ -190,6 +190,6 @@ const styles = StyleSheet.create({
   },
   addrLabel: { fontFamily: F.mono, fontSize: 11, lineHeight: 15, letterSpacing: 0.66, color: D.ink60 },
   addrTitle: { marginTop: 7, fontFamily: F.sansSemi, fontSize: 19, lineHeight: 24, color: D.ink },
-  addrCoords: { marginTop: 8, fontFamily: F.mono, fontSize: 12, lineHeight: 16, letterSpacing: 0.72, color: D.ink40 },
+  addrCoords: { marginTop: 8, fontFamily: F.mono, fontSize: 12, lineHeight: 16, letterSpacing: 0.72, color: D.ink60 },
   cancel: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink60 },
 });

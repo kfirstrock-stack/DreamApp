@@ -119,5 +119,5 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontFamily: F.mono, fontSize: 11, color: D.white },
   chip: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
-  chipText: { fontFamily: F.mono, fontSize: 10, color: D.white },
+  chipText: { fontFamily: F.mono, fontSize: 12, color: D.white },
 });

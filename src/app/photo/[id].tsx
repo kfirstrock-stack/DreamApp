@@ -275,7 +275,9 @@ export default function PhotoScreen() {
   const winStart = new Date(taken);
   winStart.setMinutes(Math.floor(taken.getMinutes() / STEP_MIN) * STEP_MIN, 0, 0);
   const winEnd = new Date(winStart.getTime() + STEP_MIN * 60000);
-  const sub = `${winStart.getDate()} ${MON[winStart.getMonth()]} ${winStart.getFullYear()} · ${hm(winStart)}–${hm(winEnd)}${list.length > 1 ? ` · ${index + 1} ИЗ ${list.length}` : ''}`;
+  const yearPart = winStart.getFullYear() === new Date().getFullYear() ? '' : ` ${winStart.getFullYear()}`;
+  const sub = `${winStart.getDate()} ${MON[winStart.getMonth()]}${yearPart} · ${hm(winStart)}–${hm(winEnd)}`;
+  const counter = list.length > 1 ? `${index + 1} из ${list.length}` : '';
 
   const openWhoElse = () =>
     router.push({
@@ -364,6 +366,7 @@ export default function PhotoScreen() {
           <Text style={styles.headSub} numberOfLines={1}>
             {sub}
           </Text>
+          {counter ? <Text style={styles.headSub} numberOfLines={1}>{counter}</Text> : null}
           {/* 13.10 · свой скрытый снимок — пометка «Только мне» */}
           {mine && cur.private ? (
             <View style={styles.privPill}>
@@ -923,7 +926,7 @@ function MenuRow({ icon, label, danger, chevron, onPress }: { icon?: IconName; l
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.menuRow, pressed && { opacity: 0.6 }]}>
       {icon && <Icon name={icon} size={22} color={danger ? D.sun : D.ink} />}
-      <Text style={[styles.menuText, danger && { color: D.sun }]}>{label}</Text>
+      <Text style={[styles.menuText, danger && { color: D.error }]}>{label}</Text>
       {chevron && <Icon name="chevR" size={14} color={D.ink60} />}
     </Pressable>
   );

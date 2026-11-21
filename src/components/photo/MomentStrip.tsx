@@ -61,6 +61,6 @@ const styles = StyleSheet.create({
   bars: { height: MAX_H, flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
   bar: { flex: 1, borderRadius: 1.5 },
   labels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, height: 14 },
-  label: { fontFamily: F.mono, fontSize: 10, color: 'rgba(244,239,230,0.4)' },
+  label: { fontFamily: F.mono, fontSize: 12, color: 'rgba(244,239,230,0.6)' },
   now: { position: 'absolute', width: 40, marginLeft: -20, textAlign: 'center', color: D.sun },
 });

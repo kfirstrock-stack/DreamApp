@@ -212,5 +212,5 @@ const styles = StyleSheet.create({
   ava: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: D.white },
   cardTime: { fontFamily: F.mono, fontSize: 11, color: D.white },
   likes: { position: 'absolute', right: 8, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(22,19,15,0.55)', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 },
-  likesText: { fontFamily: F.mono, fontSize: 10, color: D.white },
+  likesText: { fontFamily: F.mono, fontSize: 11, color: D.white },
 });

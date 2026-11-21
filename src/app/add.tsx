@@ -234,7 +234,7 @@ function Confirm(p: {
         </View>
         <Text style={[styles.label, { marginTop: 18 }]}>МЫ НАШЛИ В СНИМКЕ</Text>
         <View style={styles.found}>
-          <Pressable onPress={p.onTime} style={styles.foundRow}>
+          <Pressable onPress={p.onTime} style={styles.foundRow} accessibilityRole="button" accessibilityLabel="Время снимка, изменить">
             <View style={styles.ic}>
               <Icon name="calendar" size={18} color={D.sun} />
             </View>
@@ -247,7 +247,7 @@ function Confirm(p: {
             <Icon name="check" size={18} color={D.sun} />
           </Pressable>
           <View style={styles.divider} />
-          <Pressable onPress={p.onPlace} style={styles.foundRow}>
+          <Pressable onPress={p.onPlace} style={styles.foundRow} accessibilityRole="button" accessibilityLabel="Место снимка, изменить">
             <View style={styles.ic}>
               <Icon name="pin" size={18} color={D.sun} />
             </View>
@@ -266,7 +266,8 @@ function Confirm(p: {
           value={p.caption}
           onChangeText={p.setCaption}
           placeholder="Добавьте подпись…"
-          placeholderTextColor={D.ink40}
+          placeholderTextColor={D.ink60}
+          accessibilityLabel="Подпись к снимку"
           selectionColor={D.sun}
           style={styles.caption}
           maxLength={500}
@@ -276,7 +277,7 @@ function Confirm(p: {
         <View style={{ marginTop: 16 }}>
           <VisibilitySwitch priv={p.priv} onChange={p.setPriv} />
         </View>
-        <Pressable onPress={p.onPublish} disabled={p.uploading} style={({ pressed }) => [styles.button, { marginTop: 20 }, pressed && { opacity: 0.88 }]}>
+        <Pressable onPress={p.onPublish} disabled={p.uploading} accessibilityRole="button" accessibilityLabel="Опубликовать момент" style={({ pressed }) => [styles.button, { marginTop: 20 }, pressed && { opacity: 0.88 }]}>
           {p.uploading ? <ActivityIndicator color={D.white} /> : <Text style={styles.buttonText}>Опубликовать момент</Text>}
         </Pressable>
         <Text style={styles.footnote}>
@@ -368,7 +369,7 @@ function PublishError({ draft, error, busy, onRetry, onSave }: { draft: Draft; e
     error.kind === 'server'
       ? 'Сервер не принял снимок. Попробуйте ещё раз чуть позже — снимок, место и время сохранены.'
       : giveUp
-        ? 'Мы трижды пробовали отправить снимок. Сохраните черновик — опубликуете позже из «+».'
+        ? 'Мы трижды пробовали отправить снимок. Сохраните черновик — опубликуете позже из «+» → «Продолжить черновик».'
         : 'Связь пропала на середине загрузки. Снимок, место и время сохранены — ничего вводить заново не нужно.';
   const line = error.kind === 'server' ? 'ОШИБКА СЕРВЕРА' : `ОШИБКА СЕТИ · ПОПЫТКА ${error.attempt} ИЗ ${MAX_TRIES}`;
   return (
@@ -386,12 +387,18 @@ function PublishError({ draft, error, busy, onRetry, onSave }: { draft: Draft; e
         {__DEV__ && error.detail ? <Text style={[styles.e2Line, { marginTop: 6, color: D.sun }]} selectable>{error.detail}</Text> : null}
       </View>
       <View style={{ flex: 1 }} />
-      <Pressable onPress={onRetry} disabled={busy} style={({ pressed }) => [styles.button, pressed && { opacity: 0.88 }]}>
-        {busy ? <ActivityIndicator color={D.white} /> : <Text style={styles.buttonText}>Повторить</Text>}
+      <Pressable
+        onPress={giveUp ? onSave : onRetry}
+        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel={giveUp ? 'Сохранить черновик' : 'Повторить публикацию'}
+        style={({ pressed }) => [styles.button, pressed && { opacity: 0.88 }]}
+      >
+        {busy ? <ActivityIndicator color={D.white} /> : <Text style={styles.buttonText}>{giveUp ? 'Сохранить черновик' : 'Повторить'}</Text>}
       </Pressable>
       {/* 32 pt от кнопки, зона нажатия 45 pt */}
-      <Pressable onPress={onSave} disabled={busy} hitSlop={{ left: 16, right: 16 }} style={styles.e2Save}>
-        <Text style={styles.e2SaveText}>Сохранить черновик</Text>
+      <Pressable onPress={giveUp ? onRetry : onSave} disabled={busy} hitSlop={{ left: 16, right: 16 }} style={styles.e2Save} accessibilityRole="button" accessibilityLabel={giveUp ? 'Попробовать ещё раз' : 'Сохранить черновик'}>
+        <Text style={styles.e2SaveText}>{giveUp ? 'Попробовать ещё раз' : 'Сохранить черновик'}</Text>
       </Pressable>
     </View>
   );
@@ -414,11 +421,11 @@ const styles = StyleSheet.create({
   // E2
   e2Title: { fontFamily: F.serifItalic, fontSize: 31, lineHeight: 41, color: D.ink },
   e2Photo: { marginTop: 11, height: 250, borderRadius: 24, opacity: 0.5, backgroundColor: D.paper2 },
-  e2Card: { marginTop: 26, backgroundColor: D.white, borderWidth: 1.5, borderColor: D.sun, borderRadius: 22, paddingHorizontal: 15, paddingTop: 17, paddingBottom: 24 },
+  e2Card: { marginTop: 26, backgroundColor: D.white, borderWidth: 1.5, borderColor: D.error, borderRadius: 22, paddingHorizontal: 15, paddingTop: 17, paddingBottom: 24 },
   e2Head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   e2CardTitle: { flex: 1, fontFamily: F.sansSemi, fontSize: 17, color: D.ink },
   e2Body: { marginTop: 12, fontFamily: F.sans, fontSize: 14, lineHeight: 20, color: D.ink60 },
-  e2Line: { marginTop: 22, fontFamily: F.mono, fontSize: 10, letterSpacing: 0.6, color: D.ink40 },
+  e2Line: { marginTop: 22, fontFamily: F.mono, fontSize: 11, letterSpacing: 0.6, color: D.ink60 },
   e2Save: { alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13 },
   e2SaveText: { fontFamily: F.sansSemi, fontSize: 15, color: D.ink60 },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
@@ -487,7 +494,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 14 },
   },
   polaroidImg: { width: 210, height: 240, borderRadius: 2, backgroundColor: D.paper2 },
-  polaroidStamp: { fontFamily: F.monoRegular, fontSize: 9, letterSpacing: 0.36, color: D.ink60 },
+  polaroidStamp: { fontFamily: F.monoRegular, fontSize: 11, letterSpacing: 0.36, color: D.ink60 },
   pinBadge: {
     position: 'absolute',
     right: -14,

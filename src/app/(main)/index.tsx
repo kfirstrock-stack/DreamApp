@@ -948,7 +948,7 @@ export default function MapScreen() {
                 {clockStep ? (
                   <RollingTime key={step} index={indexSV} initial={index} step={step === 'hour' ? 60 : STEP_MIN} size={50} />
                 ) : (
-                  <Animated.Text allowFontScaling={false} key={`${step}${start.getTime()}${index}`} entering={FadeIn.duration(220)} style={styles.bigLabel}>
+                  <Animated.Text maxFontSizeMultiplier={1.3} key={`${step}${start.getTime()}${index}`} entering={FadeIn.duration(220)} style={styles.bigLabel}>
                     {bigLabel(step, start, index)}
                   </Animated.Text>
                 )}
@@ -1144,7 +1144,7 @@ const styles = StyleSheet.create({
   },
   stepRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 11 },
   stepRowText: { flex: 1, fontFamily: F.sans, fontSize: 15, color: D.ink },
-  stepRowOn: { fontFamily: F.sansSemi, color: D.sun },
+  stepRowOn: { fontFamily: F.sansSemi, color: D.ink },
   dim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(22,19,15,0.45)', justifyContent: 'flex-end', zIndex: 3000, elevation: 50 },
   layersSheet: { backgroundColor: D.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10, paddingHorizontal: 24, gap: 14 },
   layersTitle: { fontFamily: F.serif, fontSize: 24, color: D.ink },
@@ -1153,9 +1153,9 @@ const styles = StyleSheet.create({
   tilePic: { alignSelf: 'stretch', height: 80, borderRadius: 16 },
   tileOn: { borderWidth: 3, borderColor: D.sun },
   tileText: { fontFamily: F.sans, fontSize: 14, color: D.ink },
-  tileTextOn: { fontFamily: F.sansSemi, color: D.sun },
+  tileTextOn: { fontFamily: F.sansSemi, color: D.ink },
   todayChip: { height: 27, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 999, backgroundColor: D.sunSoft },
-  todayText: { fontFamily: F.sansSemi, fontSize: 12, color: D.sun },
+  todayText: { fontFamily: F.sansSemi, fontSize: 12, color: D.ink },
   timeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, marginBottom: 8, marginLeft: -4 },
   timeMeta: { marginLeft: 12, marginTop: 8 },
   until: { fontFamily: F.sans, fontSize: 18, color: D.ink60 },

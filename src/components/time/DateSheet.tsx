@@ -203,8 +203,15 @@ export function DateSheet({ step, moment, bounds, onClose, onPick }: Props) {
           </>
         )}
 
-        <Pressable onPress={show} style={({ pressed }) => [styles.button, !clockStep && { marginTop: 17.5 }, pressed && { opacity: 0.88 }]}>
-          <Text style={styles.buttonText}>Показать {count} фото</Text>
+        <Pressable
+          onPress={show}
+          accessibilityRole="button"
+          accessibilityLabel={count === 0 ? 'В это время снимков нет' : `Показать ${count} фото`}
+          style={({ pressed }) => [count === 0 ? styles.buttonQuiet : styles.button, !clockStep && { marginTop: 17.5 }, pressed && { opacity: 0.88 }]}
+        >
+          <Text style={count === 0 ? styles.buttonQuietText : styles.buttonText}>
+            {count === 0 ? 'В это время снимков нет' : `Показать ${count} фото`}
+          </Text>
         </Pressable>
       </Animated.View>
     </Animated.View>
@@ -257,7 +264,7 @@ function WheelItem({ i, y, label }: { i: number; y: SharedValue<number>; label: 
   });
   return (
     <View style={styles.item}>
-      <Animated.Text allowFontScaling={false} style={[styles.itemText, style]}>{label}</Animated.Text>
+      <Animated.Text maxFontSizeMultiplier={1.3} style={[styles.itemText, style]}>{label}</Animated.Text>
     </View>
   );
 }
@@ -282,7 +289,7 @@ const styles = StyleSheet.create({
   monthRow: { marginTop: 17, marginHorizontal: 24, height: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   monthText: { fontFamily: F.sansSemi, fontSize: 17, color: D.ink },
   weekRow: { marginTop: 14, marginHorizontal: 24, flexDirection: 'row', height: 16.5 },
-  weekText: { textAlign: 'center', fontFamily: F.monoRegular, fontSize: 10, color: D.ink40 },
+  weekText: { textAlign: 'center', fontFamily: F.monoRegular, fontSize: 11, color: D.ink60 },
   row: { marginHorizontal: 24, height: ROW, flexDirection: 'row' },
   weekBand: { position: 'absolute', left: 0, right: 0, top: 3, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,90,54,0.12)' },
   cell: { height: ROW, alignItems: 'center' },
@@ -297,4 +304,6 @@ const styles = StyleSheet.create({
   itemText: { fontFamily: F.mono, fontSize: 28, color: D.ink },
   button: { marginTop: 18.5, marginHorizontal: 24, backgroundColor: D.sunBtn, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
   buttonText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.white },
+  buttonQuiet: { marginTop: 18.5, marginHorizontal: 24, backgroundColor: D.white, borderWidth: 1.5, borderColor: D.ink, borderRadius: 999, paddingVertical: 17, alignItems: 'center' },
+  buttonQuietText: { fontFamily: F.sansSemi, fontSize: 16, lineHeight: 20, color: D.ink },
 });

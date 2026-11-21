@@ -8,6 +8,7 @@ import { Text } from '@/components/ui/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { D, F } from '@/lib/design';
+import { router } from 'expo-router';
 import { leaveAuth, markOnboarded } from '@/lib/onboarding';
 
 type Perm = { granted: boolean; canAsk: boolean };
@@ -32,9 +33,13 @@ export default function Permissions() {
     const p = await requestPhotos();
     setPhoto({ granted: p.granted, canAsk: p.canAskAgain });
   };
-  const done = async () => {
+  const later = async () => {
     await markOnboarded();
     leaveAuth();
+  };
+  const cont = async () => {
+    await markOnboarded();
+    router.replace('/past-intro');
   };
 
   return (
@@ -42,16 +47,16 @@ export default function Permissions() {
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 53, paddingHorizontal: 32 }}>
         <Text style={styles.title}>Пара разрешений</Text>
-        <Text style={styles.body}>Без них Glimika работает, но не сможет показать фото рядом и прочитать место из снимка.</Text>
+        <Text style={styles.body}>Без них Glimika работает, но не сможет показать фото рядом, прочитать место из снимка и находить совпадения.</Text>
         <Card icon="pin" title="Геопозиция" text="Покажем фото рядом с вами и отметим, где сделан снимок" perm={geo} onAsk={askGeo} style={{ marginTop: 27 }} />
         <Card icon="gallery" title="Фото" text="Возьмём из снимков время и место съёмки — вам не придётся вводить их" perm={photo} onAsk={askPhoto} style={{ marginTop: 18 }} />
         <Text style={styles.note}>Камеру спросим, когда вы впервые сделаете снимок.</Text>
         <View style={{ flex: 1, minHeight: 32 }} />
-        <Pressable onPress={done} style={({ pressed }) => [styles.button, pressed && { opacity: 0.88 }]}>
+        <Pressable onPress={cont} style={({ pressed }) => [styles.button, pressed && { opacity: 0.88 }]} accessibilityRole="button" accessibilityLabel="Продолжить: снимки из прошлого">
           <Text style={styles.buttonText}>Продолжить</Text>
         </Pressable>
         {/* 32 pt от кнопки и зона нажатия 45 pt, не заходящая на кнопку (как на A4) */}
-        <Pressable onPress={done} hitSlop={{ left: 16, right: 16 }} style={{ alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13, marginBottom: Math.max(insets.bottom + 25 - 13, 11) }}>
+        <Pressable onPress={later} hitSlop={{ left: 16, right: 16 }} style={{ alignSelf: 'center', marginTop: 32 - 13, paddingVertical: 13, marginBottom: Math.max(insets.bottom + 25 - 13, 11) }} accessibilityRole="button" accessibilityLabel="Позже, перейти к карте">
           <Text style={styles.later}>Позже</Text>
         </Pressable>
       </ScrollView>

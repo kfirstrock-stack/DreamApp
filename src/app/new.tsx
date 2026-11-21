@@ -87,7 +87,7 @@ function Guest({ onClose }: { onClose: () => void }) {
         ))}
       </View>
       <Text style={styles.gateTitle}>Войдите, чтобы опубликовать момент</Text>
-      <Text style={styles.gateText}>Смотреть карту можно и так. А чтобы выложить снимок и найти совпадения, нужен профиль — это 30 секунд.</Text>
+      <Text style={styles.gateText}>Смотреть карту можно и так. А чтобы выложить снимок и найти совпадения, нужен профиль.</Text>
       <Pressable onPress={signIn} style={({ pressed }) => [styles.button, { marginTop: 26 }, pressed && { opacity: 0.88 }]}>
         <Text style={styles.buttonText}>Войти по почте</Text>
       </Pressable>
@@ -308,7 +308,7 @@ function Source({ saved, onFull }: { saved: { draft: Draft; extras: DraftExtras 
             <Text style={styles.draftTitle} numberOfLines={1}>Продолжить черновик</Text>
             <Text style={styles.draftSub} numberOfLines={1}>{draftLine(saved)}</Text>
           </View>
-          <Icon name="chevR" size={18} color={D.ink40} />
+          <Icon name="chevR" size={18} color={D.ink60} />
         </Pressable>
       )}
       <View style={[styles.tiles, saved && { marginTop: 12 }]}>
@@ -344,7 +344,7 @@ function Source({ saved, onFull }: { saved: { draft: Draft; extras: DraftExtras 
           <Text style={styles.draftTitle} numberOfLines={1}>Снимки из прошлого</Text>
           <Text style={styles.draftSub} numberOfLines={1}>сразу много снимков</Text>
         </View>
-        <Icon name="chevR" size={18} color={D.ink40} />
+        <Icon name="chevR" size={18} color={D.ink60} />
       </Pressable>
 
       {hasRecent && (
@@ -494,7 +494,7 @@ const styles = StyleSheet.create({
   fade: { position: 'absolute', left: -24, bottom: 0 },
   geoMark: { fontFamily: F.sansSemi, fontSize: 13, lineHeight: 16, color: D.white },
   dup: { position: 'absolute', right: 6, bottom: 6, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 6, backgroundColor: 'rgba(15,14,12,0.7)' },
-  dupText: { fontFamily: F.sansSemi, fontSize: 10, lineHeight: 12, color: D.paper },
+  dupText: { fontFamily: F.sansSemi, fontSize: 11, lineHeight: 14, color: D.paper },
   accessRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6 },
   accessText: { fontFamily: F.sans, fontSize: 12, color: D.ink60 },
   denied: { marginTop: 24, gap: 11 },

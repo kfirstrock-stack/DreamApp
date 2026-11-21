@@ -35,15 +35,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      loadProfile(data.session?.user.id).finally(() => setReady(true));
-    });
+    let cancelled = false;
+    const SESSION_MS = 5000;
+    const timer = setTimeout(() => {
+      if (!cancelled) setReady(true);
+    }, SESSION_MS);
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (cancelled) return;
+        clearTimeout(timer);
+        setSession(data.session);
+        setReady(true);
+        if (data.session?.user.id) loadProfile(data.session.user.id);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        clearTimeout(timer);
+        setSession(null);
+        setReady(true);
+      });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       loadProfile(s?.user.id);
     });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      sub.subscription.unsubscribe();
+    };
   }, [loadProfile]);
 
   // 21.10: файлы скрытых снимков — в закрытое хранилище (старые и прерванные переносы)

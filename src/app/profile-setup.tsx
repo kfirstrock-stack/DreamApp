@@ -111,7 +111,7 @@ export default function ProfileSetup() {
           onFocus={() => setFocus('name')}
           onBlur={() => setFocus(null)}
           placeholder="Как к вам обращаться"
-          placeholderTextColor={D.ink40}
+          placeholderTextColor={D.ink60}
           selectionColor={D.sun}
           autoCapitalize="words"
           textContentType="name"
@@ -136,7 +136,7 @@ export default function ProfileSetup() {
           {nickState === 'free' && <Icon name="check" size={18} color={D.sun} />}
           {nickState === 'checking' && <ActivityIndicator size="small" color={D.ink40} />}
         </View>
-        {hint ? <Text style={[styles.hint, nickState === 'taken' && { color: D.sun }]}>{hint}</Text> : null}
+        {hint ? <Text style={[styles.hint, nickState === 'taken' && { color: D.error }]}>{hint}</Text> : null}
 
         <View style={{ flex: 1, minHeight: 32 }} />
         <Pressable onPress={save} disabled={!ready} style={[styles.button, { marginBottom: Math.max(insets.bottom + 2, 16) }, !ready && { opacity: 0.45 }]}>
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
   },
-  step: { marginTop: 20, fontFamily: F.mono, fontSize: 12, lineHeight: 16, letterSpacing: 0.96, color: D.sun },
+  step: { marginTop: 20, fontFamily: F.mono, fontSize: 12, lineHeight: 16, letterSpacing: 0.96, color: D.ink60 },
   title: { marginTop: 6, fontFamily: F.serif, fontSize: 36, lineHeight: 48, color: D.ink },
   avatarWrap: { alignSelf: 'center', alignItems: 'center', marginTop: 30 },
   avatar: {
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarImg: { width: 112, height: 112, borderRadius: 56, backgroundColor: D.paper2 },
-  addPhoto: { marginTop: 12, fontFamily: F.sansSemi, fontSize: 14, color: D.sun },
+  addPhoto: { marginTop: 12, fontFamily: F.sansSemi, fontSize: 14, color: D.ink, textDecorationLine: 'underline' },
   label: { fontFamily: F.mono, fontSize: 11, lineHeight: 15, letterSpacing: 0.88, color: D.ink60, marginBottom: 5 },
   field: {
     height: 55,

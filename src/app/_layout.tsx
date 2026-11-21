@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from '@/lib/auth';
+import { SnackProvider } from '@/lib/snack';
 import { D } from '@/lib/design';
 import { hideSplash } from '@/lib/onboarding';
 
@@ -37,6 +38,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
+      <SnackProvider>
         <StatusBar style="dark" />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: D.paper }, orientation: 'portrait_up' }}>
           {/* карта, профиль, раздел D, лента момента, поиск — свой JS-стек с переходами в стиле DreamApp */}
@@ -56,12 +58,14 @@ export default function RootLayout() {
           <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal', animation: 'none', gestureEnabled: false }} />
           <Stack.Screen name="profile-setup" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
           <Stack.Screen name="permissions" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
+          <Stack.Screen name="past-intro" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
           <Stack.Screen name="reset-onboarding" options={{ animation: 'none' }} />
           <Stack.Screen
             name="menu"
             options={{ presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }}
           />
         </Stack>
+      </SnackProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );
