@@ -57,7 +57,8 @@
         "expo-media-library",
         {
           "photosPermission": "Glimika показывает ваши недавние снимки, чтобы их можно было выложить на карту.",
-          "savePhotosPermission": "Glimika сохраняет снимки в вашу галерею."
+          "savePhotosPermission": "Glimika сохраняет снимки в вашу галерею.",
+          "isAccessMediaLocationEnabled": true
         }
       ],
       [
