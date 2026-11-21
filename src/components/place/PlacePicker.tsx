@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, BackHandler, Platform, Pressable, StyleSheet, View } from 'react-native';
-import MapView, { type Region } from 'react-native-maps';
+import MapView, { type Region } from '@/components/map/AppMap';
 import { Icon } from '@/components/Icon';
 import { PlaceSearch } from '@/components/place/PlaceSearch';
 import { Text } from '@/components/ui/Text';

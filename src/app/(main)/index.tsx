@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { Alert, BackHandler, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { Image } from 'expo-image';
-import MapView from 'react-native-maps';
+import MapView from '@/components/map/AppMap';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition, SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
